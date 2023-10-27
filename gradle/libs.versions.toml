@@ -91,7 +91,9 @@ compose-material3-windowsizeclass = { module = "androidx.compose.material3:mater
 compose-ui-util = { module = "androidx.compose.ui:ui-util" }
 compose-ui-viewbinding = { module = "androidx.compose.ui:ui-viewbinding" }
 
-cronet-embedded = "org.chromium.net:cronet-embedded:113.5672.61"
+# cronet-embedded = "org.chromium.net:cronet-embedded:113.5672.61"
+cronet-api = "org.chromium.net:cronet-api:113.5672.61"
+cronet-gms = "com.google.android.gms:play-services-cronet:18.0.1"
 
 desugar = "com.android.tools:desugar_jdk_libs:2.0.3"
 
