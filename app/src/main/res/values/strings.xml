@@ -688,7 +688,7 @@
     <string name="settings_advanced_cloudflare_ip_hint">Select which IP to MAP</string>
     <string name="settings_advanced_cloudflare_ip_override">Cloudflare IP Override</string>
     <string name="settings_advanced_cloudflare_ip_override_summary">Whether to MAP them to selected IP</string>
-    <string name="dark_theme_follow_system">Follow system1</string>
+    <string name="dark_theme_follow_system">Follow system</string>
     <string name="dark_theme_off">Always off</string>
     <string name="dark_theme_on">Always on</string>
     <!-- Tachiyomi Reader End-->
