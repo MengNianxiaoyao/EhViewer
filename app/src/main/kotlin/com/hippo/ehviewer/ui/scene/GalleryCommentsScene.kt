@@ -87,8 +87,10 @@ import com.hippo.ehviewer.util.ReadableTime
 import com.hippo.ehviewer.util.SimpleAnimatorListener
 import com.hippo.ehviewer.util.TextUrl
 import com.hippo.ehviewer.util.addTextToClipboard
+import com.hippo.ehviewer.util.applyNavigationBarsPadding
 import com.hippo.ehviewer.util.getParcelableCompat
 import com.hippo.ehviewer.util.toBBCode
+import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import kotlin.math.hypot
@@ -256,10 +258,19 @@ class GalleryCommentsScene : BaseToolbarScene(), View.OnClickListener, OnRefresh
             }
         }
         binding.fab.setOnClickListener(this)
-        addAboveSnackView(binding.editPanel)
-        addAboveSnackView(binding.fabLayout)
         mViewTransition = ViewTransition(binding.refreshLayout, tip)
         updateView(false)
+        binding.editPanel.applyInsetter {
+            type(ime = true, navigationBars = true) {
+                padding()
+            }
+        }
+        binding.recyclerView.applyInsetter {
+            type(ime = true, navigationBars = true) {
+                padding()
+            }
+        }
+        binding.fabLayout.applyNavigationBarsPadding()
         return binding.root
     }
 
@@ -282,8 +293,6 @@ class GalleryCommentsScene : BaseToolbarScene(), View.OnClickListener, OnRefresh
         super.onDestroyView()
         callback.remove()
         binding.recyclerView.stopScroll()
-        removeAboveSnackView(binding.editPanel)
-        removeAboveSnackView(binding.fabLayout)
         mAdapter = null
         mViewTransition = null
         _binding = null

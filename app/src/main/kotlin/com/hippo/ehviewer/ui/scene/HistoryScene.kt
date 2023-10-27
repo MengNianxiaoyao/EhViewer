@@ -46,11 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.bundleOf
-import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -61,6 +59,8 @@ import androidx.paging.compose.itemKey
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings.listThumbSize
+import com.hippo.ehviewer.icons.EhIcons
+import com.hippo.ehviewer.icons.big.History
 import com.hippo.ehviewer.ui.doGalleryInfoAction
 import com.hippo.ehviewer.ui.main.GalleryInfoListItem
 import com.hippo.ehviewer.ui.setMD3Content
@@ -88,7 +88,7 @@ class HistoryScene : BaseScene() {
                     TopAppBar(
                         title = { Text(text = stringResource(id = R.string.history)) },
                         navigationIcon = {
-                            IconButton(onClick = { toggleDrawer(GravityCompat.START) }) {
+                            IconButton(onClick = { openDrawer() }) {
                                 Icon(imageVector = Icons.Default.Menu, contentDescription = null)
                             }
                         },
@@ -173,7 +173,7 @@ class HistoryScene : BaseScene() {
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Image(
-                                painter = painterResource(id = R.drawable.big_history),
+                                imageVector = EhIcons.Big.Default.History,
                                 contentDescription = null,
                                 Modifier.padding(16.dp),
                             )

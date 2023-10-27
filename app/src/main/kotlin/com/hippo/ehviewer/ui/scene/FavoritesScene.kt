@@ -37,10 +37,8 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
-import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
@@ -88,6 +86,7 @@ import com.hippo.ehviewer.util.lazyMut
 import com.hippo.ehviewer.util.setValue
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withIOContext
+import eu.kanade.tachiyomi.util.system.dpToPx
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -169,6 +168,9 @@ class FavoritesScene : SearchBarScene() {
     private val dialogState = DialogState()
 
     override val fabLayout get() = binding.fabLayout
+    override val fastScroller get() = binding.fastScroller
+    override val recyclerView get() = binding.recyclerView
+    override val contentView get() = binding.contentLayout.contentView
 
     private fun onItemClick(position: Int) {
         // Skip if in search mode
@@ -309,7 +311,6 @@ class FavoritesScene : SearchBarScene() {
                     if (tracker.isInCustomChoice) tracker.clearSelection()
                 }
             }
-            addAboveSnackView(this)
         }
         binding.fastScroller.setOnDragHandlerListener(object : OnDragHandlerListener {
             override fun onStartDragHandler() {}
@@ -336,6 +337,7 @@ class FavoritesScene : SearchBarScene() {
                 drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
                 binding.tip.setCompoundDrawables(null, drawable, null, null)
                 binding.tip.setOnClickListener { mAdapter?.retry() }
+                binding.refreshLayout.setProgressViewOffset(true, 0, 64.dpToPx)
                 binding.refreshLayout.setOnRefreshListener { switchFav(urlBuilder.favCat) }
                 val transition = ViewTransition(binding.refreshLayout, binding.progress, binding.tip)
                 val empty = getString(R.string.gallery_list_empty_hit)
@@ -384,15 +386,13 @@ class FavoritesScene : SearchBarScene() {
                         // Delay expanding action to make layout work fine
                         SimpleHandler.post { binding.fabLayout.isExpanded = true }
                         binding.refreshLayout.isEnabled = false
-                        // Lock drawer
-                        setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, GravityCompat.START)
+                        lockDrawer()
                     }) {
                         showNormalFab()
                         binding.fabLayout.setAutoCancel(true)
                         binding.fabLayout.isExpanded = false
                         binding.refreshLayout.isEnabled = true
-                        // Unlock drawer
-                        setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START)
+                        unlockDrawer()
                     }
                     restoreSelection(savedInstanceState)
                 }
@@ -451,7 +451,6 @@ class FavoritesScene : SearchBarScene() {
     override fun onDestroyView() {
         super.onDestroyView()
         binding.recyclerView.stopScroll()
-        removeAboveSnackView(binding.fabLayout)
         mAdapter = null
         _binding = null
     }

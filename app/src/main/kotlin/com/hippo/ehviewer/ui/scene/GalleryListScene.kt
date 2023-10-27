@@ -15,6 +15,7 @@
  */
 package com.hippo.ehviewer.ui.scene
 
+import android.animation.Animator
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
@@ -33,10 +34,8 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
-import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
@@ -72,7 +71,6 @@ import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_NORMAL
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_SUBSCRIPTION
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_TAG
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_TOPLIST
-import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_UPLOADER
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_WHATS_HOT
 import com.hippo.ehviewer.client.exception.CloudflareBypassException
 import com.hippo.ehviewer.client.exception.EhException
@@ -101,13 +99,17 @@ import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.updater.AppUpdater
 import com.hippo.ehviewer.util.AnimationUtils
 import com.hippo.ehviewer.util.ExceptionUtils
+import com.hippo.ehviewer.util.SimpleAnimatorListener
+import com.hippo.ehviewer.util.applyNavigationBarsPadding
 import com.hippo.ehviewer.util.getParcelableCompat
 import com.hippo.ehviewer.util.getValue
 import com.hippo.ehviewer.util.lazyMut
 import com.hippo.ehviewer.util.setValue
+import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
+import eu.kanade.tachiyomi.util.system.dpToPx
 import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
@@ -117,6 +119,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import moe.tarsin.coroutines.runSuspendCatching
@@ -201,8 +204,16 @@ class GalleryListScene : SearchBarScene() {
     lateinit var mQuickSearchList: MutableList<QuickSearch>
     private var mHideActionFabSlop = 0
     private var mState = State.NORMAL
+    private val mSearchFabAnimatorListener = object : SimpleAnimatorListener() {
+        override fun onAnimationEnd(animation: Animator) {
+            binding.searchFab.visibility = View.INVISIBLE
+        }
+    }
 
     override val fabLayout get() = binding.fabLayout
+    override val fastScroller get() = binding.fastScroller
+    override val recyclerView get() = binding.recyclerView
+    override val contentView get() = binding.contentLayout.contentView
 
     override fun getMenuResId(): Int {
         return R.menu.scene_gallery_list_searchbar_menu
@@ -286,14 +297,6 @@ class GalleryListScene : SearchBarScene() {
             title = resources.getString(R.string.search)
         }
         setSearchBarHint(title)
-
-        when (mode) {
-            MODE_NORMAL, MODE_SUBSCRIPTION -> if (category != EhUtils.NONE || !keyword.isNullOrEmpty()) {
-                mainActivity?.clearNavCheckedItem()
-            }
-            MODE_TAG, MODE_UPLOADER, MODE_IMAGE_SEARCH -> mainActivity?.clearNavCheckedItem()
-            else -> Unit
-        }
     }
 
     private val dialogState = DialogState()
@@ -331,7 +334,7 @@ class GalleryListScene : SearchBarScene() {
             WindowInsetsAnimationHelper(
                 WindowInsetsAnimationCompat.Callback.DISPATCH_MODE_STOP,
                 binding.fabLayout,
-                mSearchFab.parent as View,
+                binding.searchFab.parent as View,
             ),
         )
         mViewTransition = BringOutTransition(binding.contentLayout.contentView, binding.searchLayout)
@@ -366,6 +369,7 @@ class GalleryListScene : SearchBarScene() {
                 drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
                 binding.tip.setCompoundDrawables(null, drawable, null, null)
                 binding.tip.setOnClickListener { mAdapter?.retry() }
+                binding.refreshLayout.setProgressViewOffset(true, 0, 64.dpToPx)
                 binding.refreshLayout.setOnRefreshListener {
                     mUrlBuilder.setIndex(null, true)
                     mUrlBuilder.mJumpTo = null
@@ -385,6 +389,7 @@ class GalleryListScene : SearchBarScene() {
                                     binding.refreshLayout.isRefreshing = true
                                 }
                             }
+
                             is LoadState.Error -> {
                                 binding.refreshLayout.isRefreshing = false
                                 binding.tip.text = ExceptionUtils.getReadableString(state.error)
@@ -400,6 +405,7 @@ class GalleryListScene : SearchBarScene() {
                                     navAnimated(R.id.webView, bundleOf(WebViewActivity.KEY_URL to EhUrl.host))
                                 }
                             }
+
                             is LoadState.NotLoading -> {
                                 binding.refreshLayout.isRefreshing = false
                                 if (mAdapter?.itemCount == 0) {
@@ -416,6 +422,7 @@ class GalleryListScene : SearchBarScene() {
                         }
                     }
                 }
+                Settings.needSignInFlow.first { !it }
                 vm.dataFlow.collectLatest {
                     adapter.submitData(it)
                 }
@@ -463,6 +470,7 @@ class GalleryListScene : SearchBarScene() {
                         mUrlBuilder.mJumpTo = null
                         mAdapter?.refresh()
                     }
+
                     2 -> { // Last
                         if (mIsTopList) {
                             mUrlBuilder.mJumpTo = "${TOPLIST_PAGES - 1}"
@@ -480,15 +488,24 @@ class GalleryListScene : SearchBarScene() {
         val actionFabDrawable = AddDeleteDrawable(requireContext(), colorID)
         binding.fabLayout.addOnExpandListener {
             if (it) {
-                setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, GravityCompat.START)
+                lockDrawer()
                 actionFabDrawable.setDelete(ANIMATE_TIME)
             } else {
-                setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START)
+                unlockDrawer()
                 actionFabDrawable.setAdd(ANIMATE_TIME)
             }
         }
         binding.fabLayout.primaryFab!!.setImageDrawable(actionFabDrawable)
-        addAboveSnackView(binding.fabLayout)
+        binding.searchFab.setOnClickListener { onApplySearch() }
+        (binding.searchFab.parent as View).apply {
+            bringToFront()
+            applyNavigationBarsPadding()
+        }
+        binding.searchLayout.applyInsetter {
+            type(statusBars = true) {
+                padding()
+            }
+        }
 
         // Update list url builder
         onUpdateUrlBuilder()
@@ -504,7 +521,6 @@ class GalleryListScene : SearchBarScene() {
         super.onDestroyView()
         stateBackPressedCallback.remove()
         binding.recyclerView.stopScroll()
-        removeAboveSnackView(binding.fabLayout)
         _binding = null
         fabAnimator = null
         mAdapter = null
@@ -705,6 +721,47 @@ class GalleryListScene : SearchBarScene() {
         }
     }
 
+    private fun showSearchFab(animation: Boolean, delay: Long = 0) {
+        if (animation) {
+            binding.searchFab.visibility = View.VISIBLE
+            binding.searchFab.animate().scaleX(1.0f).scaleY(1.0f).setListener(null)
+                .setDuration(ANIMATE_TIME).setStartDelay(delay)
+                .setInterpolator(AnimationUtils.FAST_SLOW_INTERPOLATOR).start()
+        } else {
+            binding.searchFab.visibility = View.VISIBLE
+            binding.searchFab.scaleX = 1.0f
+            binding.searchFab.scaleY = 1.0f
+        }
+    }
+
+    private fun hideSearchFab(animation: Boolean): Long {
+        return if (View.INVISIBLE == binding.searchFab.visibility) {
+            0L
+        } else {
+            if (animation) {
+                binding.searchFab.animate().scaleX(0.0f).scaleY(0.0f)
+                    .setListener(mSearchFabAnimatorListener)
+                    .setDuration(ANIMATE_TIME).setStartDelay(0L)
+                    .setInterpolator(AnimationUtils.SLOW_FAST_INTERPOLATOR).start()
+            } else {
+                binding.searchFab.visibility = View.INVISIBLE
+                binding.searchFab.scaleX = 0.0f
+                binding.searchFab.scaleY = 0.0f
+            }
+            ANIMATE_TIME
+        }
+    }
+
+    private fun selectSearchFab(animation: Boolean) {
+        val delay = hideActionFab(animation)
+        showSearchFab(animation, delay)
+    }
+
+    private fun selectActionFab(animation: Boolean) {
+        val delay = hideSearchFab(animation)
+        showActionFab(animation, delay)
+    }
+
     override fun onSearchViewExpanded() {
         if (mState == State.NORMAL) {
             hideActionFab(true)
@@ -854,9 +911,9 @@ class GalleryListScene : SearchBarScene() {
     private fun onStateChange(newState: State) {
         stateBackPressedCallback.isEnabled = newState != State.NORMAL
         if (newState == State.NORMAL || newState == State.SIMPLE_SEARCH) {
-            setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START)
+            unlockDrawer()
         } else {
-            setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, GravityCompat.START)
+            lockDrawer()
         }
     }
 

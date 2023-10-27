@@ -363,7 +363,6 @@
     <string name="default_favorites_collection">Colección de favoritos por defecto</string>
     <string name="let_me_select">Déjame elegir</string>
     <string name="collections">Colección</string>
-    <string name="need_sign_in">Se necesita iniciar sesión</string>
 
     <!-- Progress Scene -->
 
@@ -411,7 +410,6 @@
     <string name="cancel_vote_down">Cancelar voto negativo</string>
     <string name="clear_all">Limpiar todo</string>
     <string name="comment_failed">Comentario fallido</string>
-    <string name="archive">Archivo</string>
     <string name="delete">Eliminar</string>
     <string name="download_state_failed">Descarga fallida</string>
     <string name="download_state_none">Descarga en pausa</string>
@@ -435,5 +433,6 @@
     <string name="settings_privacy_secure_summary">Si habilitas esta opción no podrás hacer captura de pantalla y el sistema no mostrará una previsualización en el multitareas.\n\nDeberás reiniciar la aplicación para activar esta función.</string>
     <string name="u_config">Ajustes EHentai</string>
     <string name="apply_tip">Toca la marca de verificación para guardar los cambios</string>
+    <string name="dark_theme_follow_system">Sigue el sistema</string>
 
 </resources>

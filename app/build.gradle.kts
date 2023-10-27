@@ -64,9 +64,9 @@ android {
         applicationId = "moe.tarsin.ehviewer"
         minSdk = 28
         targetSdk = 34
-        versionCode = 180044
-        versionName = "1.8.10.1"
-        versionNameSuffix = "-censorcircum"
+        versionCode = 180045
+        versionName = "1.8.11.0"
+        versionNameSuffix = "-SNAPSHOT"
         resourceConfigurations.addAll(
             listOf(
                 "zh",
@@ -229,7 +229,6 @@ dependencies {
 
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.work.runtime)
-    implementation(libs.drawer)
     implementation(libs.photoview) // Dead Dependency
     implementation(libs.directionalviewpager) // Dead Dependency
     // https://github.com/google/accompanist/releases
@@ -247,7 +246,6 @@ dependencies {
     implementation(libs.aboutlibraries.core)
 
     implementation(libs.insetter) // Dead Dependency
-    implementation(libs.bundles.rikkax)
 
     implementation(platform(libs.arrow.stack))
     implementation(libs.arrow.fx.coroutines)
@@ -287,16 +285,6 @@ ksp {
 aboutLibraries {
     duplicationMode = MERGE
     duplicationRule = GROUP
-    exclusionPatterns = listOf(
-        "androidx\\..*".toPattern(),
-        ".*annotations".toPattern(),
-        "com\\.google\\.code\\..*".toPattern(),
-        "com\\.google\\.guava:listenablefuture".toPattern(),
-        "com\\.google\\.protobuf:protobuf-javalite".toPattern(),
-        "org\\.checkerframework:checker-qual".toPattern(),
-        "org\\.chromium\\.net:cronet-embedded".toPattern(),
-        "org\\.slf4j:slf4j-api".toPattern(),
-    )
 }
 
 cargo {

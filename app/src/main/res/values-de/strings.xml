@@ -60,7 +60,7 @@
     <string name="gallery_list_search_bar_hint_e_hentai">E-Hentai durchsuchen</string>
     <string name="gallery_list_empty_hit">Die Welt ist so groß und der Panda sitzt ganz allein</string>
     <string name="search">Suchen</string>
-    <string name="keyword_search">"Suche nach dem Schlüsselwort "</string>
+    <string name="keyword_search">Suche nach dem Schlüsselwort</string>
     <string name="image_search">Suche nach einem Bild</string>
     <string name="search_normal">Normale Suche</string>
     <string name="search_advance">Erweiterte Optionen</string>
@@ -204,7 +204,7 @@
     <string name="download_remove_dialog_check_text">Bilddateien löschen</string>
     <string name="stat_download_action_stop_all">Alle stopppen</string>
     <string name="default_download_label_name">Standard</string>
-    <string name="download_move_dialog_title">"Verschieben "</string>
+    <string name="download_move_dialog_title">Verschieben</string>
     <string name="download_labels">Download-Etikette</string>
     <string name="download_start_all">Alle starten</string>
     <string name="download_stop_all">Alle stoppen</string>
@@ -303,7 +303,6 @@
     <string name="default_favorites_collection">Standard-Favoriten</string>
     <string name="let_me_select">Manuell auswählen</string>
     <string name="collections">Kollektionen</string>
-    <string name="need_sign_in">Du musst dich zuerst anmelden</string>
     <string name="error_something_wrong_happened">Ein Fehler ist aufgetreten</string>
     <string name="from_the_future">Von der Zukunft</string>
     <string name="just_now">Gerade</string>
@@ -312,7 +311,6 @@
     <string name="no_archives">Keine Archivdatei</string>
     <string name="download_archive_started">Archivdatei wird heruntergeladen</string>
     <string name="download_archive_failure">Fehler beim Herunterladen der Archivdatei</string>
-    <string name="archive">Archivdateien</string>
     <string name="download_archive_failure_no_hath">H@H-Klient ist für das Herunterladen der Archivdateien erforderlich</string>
     <string name="settings_privacy">Datenschutzoptionen</string>
     <string name="settings_privacy_secure">Screenshot verhindern</string>
@@ -349,5 +347,6 @@
     <string name="settings_eh_identity_cookies_copy">Kopieren</string>
     <string name="settings_eh_show_gallery_pages">Galerieseitenzahl anzeigen</string>
     <string name="settings_eh_show_gallery_pages_summary">Die Galerieseitenzahle in der Galerieliste anzeigen</string>
+    <string name="dark_theme_follow_system">System folgen</string>
 
 </resources>

@@ -96,7 +96,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.viewinterop.AndroidViewBinding
 import androidx.core.content.ContextCompat
 import androidx.core.text.parseAsHtml
 import androidx.lifecycle.lifecycleScope
@@ -979,7 +979,7 @@ class GalleryDetailScene : BaseScene() {
         context ?: return
         if (mPage != 0) {
             Snackbar.make(
-                requireActivity().findViewById(R.id.snackbar),
+                requireActivity().findViewById(R.id.fragment_container),
                 getString(R.string.read_from, mPage),
                 Snackbar.LENGTH_LONG,
             ).setAction(R.string.read) { context?.navToReader(gd.galleryInfo, mPage) }.show()
@@ -1027,17 +1027,15 @@ class GalleryDetailScene : BaseScene() {
             if (commentsList != null) {
                 val length = maxShowCount.coerceAtMost(commentsList.size)
                 for (i in 0 until length) {
-                    val comment = commentsList[i]
-                    AndroidView(factory = { context ->
-                        ItemGalleryCommentBinding.inflate(LayoutInflater.from(context), null, false).apply {
-                            card.setOnClickListener { onNavigateToCommentScene() }
-                            user.text = comment.user
-                            user.setBackgroundColor(Color.TRANSPARENT)
-                            time.text = ReadableTime.getTimeAgo(comment.time)
-                            this.comment.maxLines = 5
-                            this.comment.text = comment.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(this.comment))
-                        }.root
-                    })
+                    val item = commentsList[i]
+                    AndroidViewBinding(factory = ItemGalleryCommentBinding::inflate) {
+                        card.setOnClickListener { onNavigateToCommentScene() }
+                        user.text = item.user
+                        user.setBackgroundColor(Color.TRANSPARENT)
+                        time.text = ReadableTime.getTimeAgo(item.time)
+                        comment.maxLines = 5
+                        comment.text = item.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(comment))
+                    }
                 }
             }
             Box(

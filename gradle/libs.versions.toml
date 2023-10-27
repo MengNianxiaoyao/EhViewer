@@ -24,13 +24,13 @@ arrow = "1.2.1"
 chucker = "4.0.0"
 coil = "2.4.0"
 compose-bom = "2023.11.00-alpha02"
-compose-compiler = "1.5.4-dev-k1.9.20-RC-1edce5fd625"
+compose-compiler = "1.5.4-dev-k1.9.20-RC2-93f1625925e"
 google-accompanist = "0.32.0"
 google-android-material = "1.11.0-beta01"
-kotlin = "1.9.20-RC"
+kotlin = "1.9.20-RC2"
 kotlinx-coroutines = "1.7.3"
 kotlinx-serialization = "1.6.0"
-ksp = "1.9.20-RC-1.0.13"
+ksp = "1.9.20-RC2-1.0.13"
 ktlint = "1.0.1"
 ktor = "2.3.5"
 leakcanary = "2.12"
@@ -89,13 +89,13 @@ compose-material-icons-extended = { module = "androidx.compose.material:material
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material3-windowsizeclass = { module = "androidx.compose.material3:material3-window-size-class" }
 compose-ui-util = { module = "androidx.compose.ui:ui-util" }
+compose-ui-viewbinding = { module = "androidx.compose.ui:ui-viewbinding" }
 
 cronet-embedded = "org.chromium.net:cronet-embedded:113.5672.61"
 
 desugar = "com.android.tools:desugar_jdk_libs:2.0.3"
 
 directionalviewpager = "com.github.tachiyomiorg:DirectionalViewPager:1.0.0"
-drawer = "com.drakeet.drawer:drawer:1.0.3"
 insetter = "dev.chrisbanes.insetter:insetter:0.6.1"
 jsoup = "org.jsoup:jsoup:1.16.2"
 
@@ -123,10 +123,6 @@ photoview = "com.github.chrisbanes:PhotoView:2.3.0"
 
 r8 = { module = "com.android.tools:r8", version.ref = "android-tools-r8" }
 
-rikkax-core = "dev.rikka.rikkax.core:core-ktx:1.4.1"
-rikkax-insets = "dev.rikka.rikkax.insets:insets:1.3.0"
-rikkax-layoutinflater = "dev.rikka.rikkax.layoutinflater:layoutinflater:1.3.0"
-
 splitties-appctx = { module = "com.louiscad.splitties:splitties-appctx", version.ref = "splitties" }
 splitties-arch-room = { module = "com.louiscad.splitties:splitties-arch-room", version.ref = "splitties" }
 splitties-preferences = { module = "com.louiscad.splitties:splitties-preferences", version.ref = "splitties" }
@@ -138,12 +134,11 @@ androidx-navigation = ["androidx-navigation-compose", "androidx-navigation-fragm
 androidx-paging = ["androidx-paging-compose", "androidx-paging-runtime"]
 androidx-recyclerview = ["androidx-recyclerview", "androidx-recyclerview-selection"]
 coil = ["coil-compose", "coil-gif"]
-compose = ["compose-material-icons-extended", "compose-material3", "compose-material3-windowsizeclass", "compose-ui-util"]
-cronet = ["cronet-embedded"]
+compose = ["compose-material-icons-extended", "compose-material3", "compose-material3-windowsizeclass", "compose-ui-util", "compose-ui-viewbinding"]
+cronet = ["cronet-api", "cronet-gms"]
 kotlinx-serialization = ["kotlinx-serialization-cbor", "kotlinx-serialization-json", "kotlinx-serialization-json-okio"]
 ktor = ["ktor-io-jvm", "ktor-utils-jvm"]
 okhttp = ["okhttp-android", "okhttp-coroutines"]
-rikkax = ["rikkax-core", "rikkax-insets", "rikkax-layoutinflater"]
 splitties = ["splitties-appctx", "splitties-arch-room", "splitties-preferences", "splitties-systemservices"]
 
 [plugins]

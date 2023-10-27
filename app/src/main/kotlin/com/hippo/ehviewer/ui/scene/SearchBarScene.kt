@@ -9,10 +9,9 @@ import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.CallSuper
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -28,9 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.search.SearchView
 import com.google.android.material.shape.MaterialShapeDrawable
@@ -46,8 +43,10 @@ import com.hippo.ehviewer.ui.legacy.FabLayout
 import com.hippo.ehviewer.ui.setMD3Content
 import com.hippo.ehviewer.util.AnimationUtils
 import com.hippo.ehviewer.util.SimpleAnimatorListener
+import com.hippo.ehviewer.util.applyNavigationBarsPadding
 import com.jamal.composeprefs3.ui.ifNotNullThen
 import com.jamal.composeprefs3.ui.ifTrueThen
+import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.tachiyomi.util.lang.launchIO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -58,22 +57,20 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
     private val binding get() = _binding!!
     private var mSuggestionList by mutableStateOf(emptyList<Suggestion>())
     private var mSuggestionProvider: SuggestionProvider? = null
-    var allowEmptySearch = true
+    private var allowEmptySearch = true
     private val mSearchDatabase = searchDatabase.searchDao()
     private var onApplySearch: (String) -> Unit = {}
-    protected val mSearchFab get() = binding.searchFab
-    protected abstract val fabLayout: FabLayout
     protected var mShowActionFab = true
     protected val mActionFabAnimatorListener = object : SimpleAnimatorListener() {
         override fun onAnimationEnd(animation: Animator) {
             fabLayout.primaryFab?.visibility = View.INVISIBLE
         }
     }
-    private val mSearchFabAnimatorListener = object : SimpleAnimatorListener() {
-        override fun onAnimationEnd(animation: Animator) {
-            mSearchFab.visibility = View.INVISIBLE
-        }
-    }
+
+    protected abstract val fabLayout: FabLayout
+    protected abstract val fastScroller: View
+    protected abstract val recyclerView: View
+    protected abstract val contentView: View
 
     override val showLeftDrawer = true
 
@@ -87,7 +84,7 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
         }
         binding.searchBarList.consumeWindowInsets = false
         binding.searchBarList.setMD3Content {
-            LazyColumn(contentPadding = WindowInsets.navigationBars.asPaddingValues()) {
+            LazyColumn(modifier = Modifier.navigationBarsPadding().imePadding()) {
                 items(mSuggestionList) {
                     ListItem(
                         headlineContent = { Text(text = it.keyword) },
@@ -119,13 +116,20 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
                 onSearchViewHidden()
             }
         }
-        mSearchFab.setOnClickListener { onApplySearch() }
         onCreateViewWithToolbar(inflater, binding.root, savedInstanceState)
         // This has to be placed after onCreateViewWithToolbar() since
         // callbacks are invoked in the reverse order in which they are added
         binding.searchview.addTransitionListener(mSearchViewOnBackPressedCallback)
         requireActivity().onBackPressedDispatcher.addCallback(mSearchViewOnBackPressedCallback)
         binding.appbar.bringToFront()
+        fabLayout.applyNavigationBarsPadding()
+        fastScroller.applyNavigationBarsPadding()
+        recyclerView.applyNavigationBarsPadding()
+        contentView.applyInsetter {
+            type(statusBars = true) {
+                padding()
+            }
+        }
         return binding.root
     }
 
@@ -148,16 +152,13 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
         _binding = null
     }
 
-    private var privLockModeStart: Int? = null
+    private var drawerLocked = false
 
     @CallSuper
     open fun onSearchViewExpanded() {
-        privLockModeStart = getDrawerLockMode(GravityCompat.START)
-        privLockModeStart?.let {
-            setDrawerLockMode(
-                DrawerLayout.LOCK_MODE_LOCKED_CLOSED,
-                GravityCompat.START,
-            )
+        if (!isDrawerLocked) {
+            drawerLocked = true
+            lockDrawer()
         }
         updateSuggestions()
     }
@@ -165,38 +166,9 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
     @CallSuper
     open fun onSearchViewHidden() {
         binding.toolbar.setText(binding.searchview.text)
-        privLockModeStart?.let { setDrawerLockMode(it, GravityCompat.START) }
-        privLockModeStart = null
-    }
-
-    fun showSearchFab(animation: Boolean, delay: Long = 0) {
-        if (animation) {
-            mSearchFab.visibility = View.VISIBLE
-            mSearchFab.animate().scaleX(1.0f).scaleY(1.0f).setListener(null)
-                .setDuration(ANIMATE_TIME).setStartDelay(delay)
-                .setInterpolator(AnimationUtils.FAST_SLOW_INTERPOLATOR).start()
-        } else {
-            mSearchFab.visibility = View.VISIBLE
-            mSearchFab.scaleX = 1.0f
-            mSearchFab.scaleY = 1.0f
-        }
-    }
-
-    fun hideSearchFab(animation: Boolean): Long {
-        return if (View.INVISIBLE == mSearchFab.visibility) {
-            0L
-        } else {
-            if (animation) {
-                mSearchFab.animate().scaleX(0.0f).scaleY(0.0f)
-                    .setListener(mSearchFabAnimatorListener)
-                    .setDuration(ANIMATE_TIME).setStartDelay(0L)
-                    .setInterpolator(AnimationUtils.SLOW_FAST_INTERPOLATOR).start()
-            } else {
-                mSearchFab.visibility = View.INVISIBLE
-                mSearchFab.scaleX = 0.0f
-                mSearchFab.scaleY = 0.0f
-            }
-            ANIMATE_TIME
+        if (drawerLocked) {
+            unlockDrawer()
+            drawerLocked = false
         }
     }
 
@@ -240,16 +212,6 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
         }
     }
 
-    fun selectSearchFab(animation: Boolean) {
-        val delay = hideActionFab(animation)
-        showSearchFab(animation, delay)
-    }
-
-    fun selectActionFab(animation: Boolean) {
-        val delay = hideSearchFab(animation)
-        showActionFab(animation, delay)
-    }
-
     fun setSearchBarHint(hint: String?) {
         binding.toolbar.hint = hint
     }
@@ -264,7 +226,7 @@ abstract class SearchBarScene : BaseScene(), ToolBarScene {
     }
 
     override fun onNavigationClick() {
-        toggleDrawer(GravityCompat.START)
+        openDrawer()
     }
 
     override fun getMenuResId(): Int {
