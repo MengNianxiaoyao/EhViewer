@@ -64,7 +64,7 @@ jobs:
       - name: Releases
         uses: softprops/action-gh-release@v1
         with:
-          body: Bump Version
+          body: EhViewer Version ${{ github.ref_name }}
           files: |
             EhViewer-${{ github.ref_name }}-default-gms-universal.apk
             EhViewer-${{ github.ref_name }}-default-gms-arm64-v8a.apk
