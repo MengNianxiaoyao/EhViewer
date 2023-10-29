@@ -62,7 +62,7 @@ object Settings : DataStorePreferences(null) {
     var saveParseErrorBody by boolPref("save_parse_error_body", true)
     var saveCrashLog by boolPref("save_crash_log", true)
     var security by boolPref("require_unlock", false)
-    var builtInHosts by boolPref(KEY_BUILT_IN_HOSTS, false)
+    var builtInHosts by boolPref(KEY_BUILT_IN_HOSTS, true)
     var removeImageFiles by boolPref("include_pic", true)
     var needSignIn by boolPref("need_sign_in", true).also { needSignInFlow = it.valueFlow() }
     var blackDarkTheme by boolPref("black_dark_theme", false).observed { updateWhenAmoledModeChanges() }
@@ -98,8 +98,6 @@ object Settings : DataStorePreferences(null) {
     init {
         if ("CN" == Locale.getDefault().country) {
             edit {
-                if (KEY_BUILT_IN_HOSTS !in prefs) builtInHosts = true
-                if (KEY_DOMAIN_FRONTING !in prefs) dF = true
                 if (KEY_SHOW_TAG_TRANSLATIONS !in prefs) showTagTranslations = true
             }
         }
