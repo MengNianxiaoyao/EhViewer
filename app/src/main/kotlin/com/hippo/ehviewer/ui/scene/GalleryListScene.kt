@@ -30,7 +30,6 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material3.Text
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
@@ -127,7 +126,6 @@ import rikka.core.res.resolveColor
 
 class VMStorage1 : ViewModel() {
     var urlBuilder = ListUrlBuilder()
-    var shouldScrollToTop = false
     val dataFlow = Pager(PagingConfig(25)) {
         object : PagingSource<String, BaseGalleryInfo>() {
             override fun getRefreshKey(state: PagingState<String, BaseGalleryInfo>): String? = null
@@ -158,7 +156,6 @@ class VMStorage1 : ViewModel() {
                         } else {
                             urlBuilder.setIndex(key, false)
                         }
-                        shouldScrollToTop = true
                     }
                 }
                 val r = runSuspendCatching {
@@ -324,7 +321,7 @@ class GalleryListScene : SearchBarScene() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = SceneGalleryListBinding.inflate(inflater, container!!)
-        container.addView(ComposeView(inflater.context).apply { setMD3Content { dialogState.Intercept() } })
+        container.addView(ComposeWithViewLifecycle().apply { setMD3Content { dialogState.Intercept() } })
         checkForUpdates()
         requireActivity().onBackPressedDispatcher.addCallback(stateBackPressedCallback)
         mHideActionFabSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
@@ -383,10 +380,7 @@ class GalleryListScene : SearchBarScene() {
                             is LoadState.Loading -> {
                                 showSearchBar()
                                 if (!binding.refreshLayout.isRefreshing) {
-                                    // https://github.com/FooIbar/EhViewer/issues/45
-                                    // transition.showView(1)
-                                    transition.showView(0, false)
-                                    binding.refreshLayout.isRefreshing = true
+                                    transition.showView(1)
                                 }
                             }
 
@@ -412,11 +406,7 @@ class GalleryListScene : SearchBarScene() {
                                     binding.tip.text = empty
                                     transition.showView(2)
                                 } else {
-                                    transition.showView(0, false)
-                                    if (vm.shouldScrollToTop) {
-                                        vm.shouldScrollToTop = false
-                                        binding.recyclerView.scrollToPosition(0)
-                                    }
+                                    transition.showView(0)
                                 }
                             }
                         }

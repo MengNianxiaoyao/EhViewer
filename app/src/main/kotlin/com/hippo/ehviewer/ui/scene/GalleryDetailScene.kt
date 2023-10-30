@@ -91,7 +91,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.LocalPinnableContainer
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -416,7 +415,7 @@ class GalleryDetailScene : BaseScene() {
             getDetailError = getString(R.string.error_cannot_find_gallery)
         }
         (requireActivity() as MainActivity).mShareUrl = galleryDetailUrl
-        return ComposeView(requireContext()).apply {
+        return ComposeWithViewLifecycle().apply {
             setMD3Content {
                 LaunchedEffect(gid) {
                     EhDownloadManager.stateFlow(gid).collect {
@@ -726,7 +725,9 @@ class GalleryDetailScene : BaseScene() {
             Spacer(modifier = Modifier.size(dimensionResource(id = R.dimen.keyline_margin)))
         }
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         ) {
             val favored by produceState(initialValue = false) {
@@ -1014,9 +1015,9 @@ class GalleryDetailScene : BaseScene() {
 
     @SuppressLint("InflateParams")
     @Composable
-    private fun GalleryDetailComment(commentsList: Array<GalleryComment>?) {
+    private fun GalleryDetailComment(commentsList: Array<GalleryComment>) {
         val maxShowCount = 2
-        val commentText = if (commentsList.isNullOrEmpty()) {
+        val commentText = if (commentsList.isEmpty()) {
             stringResource(R.string.no_comments)
         } else if (commentsList.size <= maxShowCount) {
             stringResource(R.string.no_more_comments)
@@ -1024,23 +1025,24 @@ class GalleryDetailScene : BaseScene() {
             stringResource(R.string.more_comment)
         }
         CrystalCard {
-            if (commentsList != null) {
-                val length = maxShowCount.coerceAtMost(commentsList.size)
-                for (i in 0 until length) {
-                    val item = commentsList[i]
-                    AndroidViewBinding(factory = ItemGalleryCommentBinding::inflate) {
-                        card.setOnClickListener { onNavigateToCommentScene() }
-                        user.text = item.user
-                        user.setBackgroundColor(Color.TRANSPARENT)
-                        time.text = ReadableTime.getTimeAgo(item.time)
-                        comment.maxLines = 5
-                        comment.text = item.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(comment))
-                    }
+            val length = maxShowCount.coerceAtMost(commentsList.size)
+            for (i in 0 until length) {
+                val item = commentsList[i]
+                AndroidViewBinding(factory = ItemGalleryCommentBinding::inflate) {
+                    card.setOnClickListener { onNavigateToCommentScene() }
+                    user.text = item.user
+                    user.setBackgroundColor(Color.TRANSPARENT)
+                    time.text = ReadableTime.getTimeAgo(item.time)
+                    comment.maxLines = 5
+                    comment.text = item.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(comment))
                 }
             }
             Box(
-                modifier = Modifier.fillMaxWidth().padding(bottom = dimensionResource(id = R.dimen.strip_item_padding_v))
-                    .clip(RoundedCornerShape(16.dp)).clickable(onClick = ::onNavigateToCommentScene),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = dimensionResource(id = R.dimen.strip_item_padding_v))
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClick = ::onNavigateToCommentScene),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(commentText)
