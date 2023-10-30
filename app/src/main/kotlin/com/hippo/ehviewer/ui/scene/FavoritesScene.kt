@@ -33,7 +33,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.currentRecomposeScope
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
@@ -94,6 +93,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import moe.tarsin.coroutines.runSuspendCatching
@@ -102,7 +102,6 @@ import rikka.core.res.resolveColor
 // Note that we do not really follow mvvm structure, just use it as ... storage
 class VMStorage : ViewModel() {
     var urlBuilder = FavListUrlBuilder(favCat = Settings.recentFavCat)
-    var shouldScrollToTop = false
     private val cloudDataFlow = Pager(PagingConfig(25)) {
         object : PagingSource<String, BaseGalleryInfo>() {
             override fun getRefreshKey(state: PagingState<String, BaseGalleryInfo>): String? = null
@@ -119,7 +118,6 @@ class VMStorage : ViewModel() {
                         } else {
                             urlBuilder.setIndex(key, false)
                         }
-                        shouldScrollToTop = true
                     }
                 }
                 val r = runSuspendCatching {
@@ -155,15 +153,7 @@ class FavoritesScene : SearchBarScene() {
     private val binding get() = _binding!!
     private var mAdapter: GalleryAdapter? = null
     private val tracker get() = mAdapter!!.tracker!!
-    private val showNormalFabsRunnable = Runnable {
-        updateJumpFab() // index: 0, 2
-        binding.fabLayout.run {
-            setSecondaryFabVisibilityAt(1, true)
-            for (i in 3..6) {
-                setSecondaryFabVisibilityAt(i, false)
-            }
-        }
-    }
+    private var showNormalFabsJob: Job? = null
 
     private val dialogState = DialogState()
 
@@ -235,7 +225,7 @@ class FavoritesScene : SearchBarScene() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = SceneFavoritesBinding.inflate(inflater, container!!)
-        container.addView(ComposeView(inflater.context).apply { setMD3Content { dialogState.Intercept() } })
+        container.addView(ComposeWithViewLifecycle().apply { setMD3Content { dialogState.Intercept() } })
         setOnApplySearch {
             if (!tracker.isInCustomChoice) {
                 switchFav(urlBuilder.favCat, it)
@@ -347,10 +337,7 @@ class FavoritesScene : SearchBarScene() {
                             is LoadState.Loading -> {
                                 showSearchBar()
                                 if (!binding.refreshLayout.isRefreshing) {
-                                    // https://github.com/FooIbar/EhViewer/issues/45
-                                    // transition.showView(1)
-                                    transition.showView(0, false)
-                                    binding.refreshLayout.isRefreshing = true
+                                    transition.showView(1)
                                 }
                             }
                             is LoadState.Error -> {
@@ -364,11 +351,7 @@ class FavoritesScene : SearchBarScene() {
                                     binding.tip.text = empty
                                     transition.showView(2)
                                 } else {
-                                    transition.showView(0, false)
-                                    if (vm.shouldScrollToTop) {
-                                        vm.shouldScrollToTop = false
-                                        binding.recyclerView.scrollToPosition(0)
-                                    }
+                                    transition.showView(0)
                                 }
                             }
                         }
@@ -453,9 +436,10 @@ class FavoritesScene : SearchBarScene() {
         binding.recyclerView.stopScroll()
         mAdapter = null
         _binding = null
+        showNormalFabsJob = null
     }
 
-    override fun onCreateDrawerView(inflater: LayoutInflater) = ComposeView(inflater.context).apply {
+    override fun onCreateDrawerView(inflater: LayoutInflater) = ComposeWithViewLifecycle().apply {
         setMD3Content {
             val localFavCount by vm.localFavCount.collectAsState(0)
             ElevatedCard {
@@ -531,12 +515,20 @@ class FavoritesScene : SearchBarScene() {
 
     private fun showNormalFab() {
         // Delay showing normal fab to avoid mutation
-        SimpleHandler.removeCallbacks(showNormalFabsRunnable)
-        SimpleHandler.postDelayed(showNormalFabsRunnable, 300)
+        showNormalFabsJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(300)
+            updateJumpFab() // index: 0, 2
+            binding.fabLayout.run {
+                setSecondaryFabVisibilityAt(1, true)
+                for (i in 3..6) {
+                    setSecondaryFabVisibilityAt(i, false)
+                }
+            }
+        }
     }
 
     private fun showSelectionFab() {
-        SimpleHandler.removeCallbacks(showNormalFabsRunnable)
+        showNormalFabsJob?.cancel()
         binding.fabLayout.run {
             for (i in 0..2) {
                 setSecondaryFabVisibilityAt(i, false)
