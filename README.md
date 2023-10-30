@@ -10,7 +10,3 @@
 | Marshmallow | Android 6.0-8.1, 有限支持* |
 
 \* 不支持压缩包和 GIF
-
-## 缺陷和功能请求
-
-除了不能直连之外，别找我，去[上游](https://github.com/FooIbar/EhViewer)提出。
