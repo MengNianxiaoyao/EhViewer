@@ -72,7 +72,6 @@ object Settings : DataStorePreferences(null) {
     var dF by boolPref(KEY_DOMAIN_FRONTING, false)
     var downloadOriginImage by boolPref("download_origin_image", false)
     var enableCronet by boolPref("enable_cronet", true)
-    var bypassVpn by boolPref("bypass_vpn", true)
     var thumbSizeDp by intPref("thumb_size_", 120)
     var recentFavCat by intPref("recent_fav_cat", FavListUrlBuilder.FAV_CAT_LOCAL)
     var defaultFavSlot by intPref("default_favorite_slot", -2)
