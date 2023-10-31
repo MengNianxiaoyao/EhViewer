@@ -287,7 +287,6 @@ class MainActivity : EhActivity() {
                     }
                 },
                 drawerState = drawerState,
-                // Disabled for breaking custom swipe gestures
                 gesturesEnabled = !drawerLocked || drawerState.isOpen,
             ) {
                 val insets = buildWindowInsets {
