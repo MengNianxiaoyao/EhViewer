@@ -23,7 +23,6 @@ import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -43,17 +42,14 @@ import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.webkit.MimeTypeMap
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.activity.viewModels
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AlertDialog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
@@ -73,8 +69,8 @@ import com.hippo.ehviewer.gallery.EhPageLoader
 import com.hippo.ehviewer.gallery.PageLoader2
 import com.hippo.ehviewer.image.Image
 import com.hippo.ehviewer.ui.EhActivity
-import com.hippo.ehviewer.ui.legacy.EditTextDialogBuilder
 import com.hippo.ehviewer.ui.setMD3Content
+import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.FileUtils
@@ -83,7 +79,9 @@ import com.hippo.ehviewer.util.getParcelableExtraCompat
 import com.hippo.ehviewer.util.getValue
 import com.hippo.ehviewer.util.isAtLeastO
 import com.hippo.ehviewer.util.isAtLeastP
+import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.lazyMut
+import com.hippo.ehviewer.util.requestPermission
 import com.hippo.ehviewer.util.sendTo
 import com.hippo.ehviewer.util.setValue
 import com.hippo.unifile.UniFile
@@ -96,6 +94,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReadingModeType
 import eu.kanade.tachiyomi.ui.reader.viewer.BaseViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
 import eu.kanade.tachiyomi.util.lang.launchIO
+import eu.kanade.tachiyomi.util.lang.launchUI
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import eu.kanade.tachiyomi.util.system.applySystemAnimatorScale
 import eu.kanade.tachiyomi.util.system.isNightMode
@@ -105,20 +104,13 @@ import eu.kanade.tachiyomi.util.view.setTooltip
 import eu.kanade.tachiyomi.widget.listener.SimpleAnimationListener
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
-import kotlinx.coroutines.suspendCancellableCoroutine
 import splitties.init.appCtx
 import splitties.systemservices.clipboardManager
 
@@ -140,6 +132,7 @@ class ReaderActivity : EhActivity() {
     private var mPage: Int = 0
     private var mCacheFileName: String? = null
     private val vm: GalleryModel by viewModels()
+    private val dialogState = DialogState()
 
     /**
      * Whether the menu is currently visible.
@@ -177,20 +170,6 @@ class ReaderActivity : EhActivity() {
     }
     var mGalleryProvider by lazyMut { vm::galleryProvider }
     private var mCurrentIndex: Int = 0
-    private var mSavingPage = -1
-    private lateinit var builder: EditTextDialogBuilder
-    private var dialogShown = false
-    private lateinit var dialog: AlertDialog
-    private var requestStoragePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { result ->
-        if (result!! && mSavingPage != -1) {
-            saveImage(mSavingPage)
-        } else {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-        }
-        mSavingPage = -1
-    }
 
     private val galleryDetailUrl: String?
         get() {
@@ -225,43 +204,27 @@ class ReaderActivity : EhActivity() {
                         Toast.makeText(this, R.string.error_reading_failed, Toast.LENGTH_SHORT).show()
                     }
 
-                    val continuation: AtomicReference<Continuation<String>?> = AtomicReference(null)
                     mGalleryProvider = ArchivePageLoader(
                         appCtx,
                         mUri!!,
-                        flow {
-                            if (!dialogShown) {
-                                withUIContext {
-                                    dialogShown = true
-                                    dialog.run {
-                                        show()
-                                        getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                                            val passwd = builder.text
-                                            if (passwd.isEmpty()) {
-                                                builder.setError(getString(R.string.passwd_cannot_be_empty))
-                                            } else {
-                                                continuation.getAndSet(null)?.resume(passwd)
-                                            }
-                                        }
-                                        setOnCancelListener {
-                                            finish()
-                                        }
-                                    }
+                    ) { invalidator ->
+                        runCatching {
+                            dialogState.awaitInputText(
+                                title = getString(R.string.archive_need_passwd),
+                                hint = getString(R.string.archive_passwd),
+                            ) {
+                                if (it.isBlank()) {
+                                    getString(R.string.passwd_cannot_be_empty)
+                                } else if (invalidator(it)) {
+                                    null
+                                } else {
+                                    getString(R.string.passwd_wrong)
                                 }
                             }
-                            while (true) {
-                                currentCoroutineContext().ensureActive()
-                                val r = suspendCancellableCoroutine {
-                                    continuation.set(it)
-                                    it.invokeOnCancellation { dialog.dismiss() }
-                                }
-                                emit(r)
-                                withUIContext {
-                                    builder.setError(getString(R.string.passwd_wrong))
-                                }
-                            }
-                        },
-                    )
+                        }.onFailure {
+                            finish()
+                        }.getOrThrow()
+                    }
                 }
             } else {
                 Toast.makeText(this, "Archives are not supported before Android P", Toast.LENGTH_LONG).show()
@@ -337,13 +300,10 @@ class ReaderActivity : EhActivity() {
         }
         buildProvider()
         binding = ReaderActivityBinding.inflate(layoutInflater)
+        binding.dialogStub.setMD3Content {
+            dialogState.Intercept()
+        }
         setContentView(binding.root)
-        builder = EditTextDialogBuilder(this, null, getString(R.string.archive_passwd))
-        builder.setTitle(getString(R.string.archive_need_passwd))
-        builder.setPositiveButton(getString(android.R.string.ok), null)
-        dialog = builder.create()
-        dialog.setCanceledOnTouchOutside(false)
-
         mGalleryProvider.let {
             if (it == null) {
                 finish()
@@ -361,8 +321,6 @@ class ReaderActivity : EhActivity() {
 
     fun setGallery() {
         if (mGalleryProvider?.isReady != true) return
-        // TODO: Not well place to call it
-        dialog.dismiss()
 
         // Get start page
         if (mCurrentIndex == 0) {
@@ -486,78 +444,73 @@ class ReaderActivity : EhActivity() {
     }
 
     fun saveImage(page: Int) {
-        if (null == mGalleryProvider) {
-            return
-        }
+        mGalleryProvider ?: return
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            mSavingPage = page
-            requestStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            return
-        }
+        lifecycleScope.launchUI {
+            val granted = isAtLeastQ || requestPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            if (granted) {
+                val filename = mGalleryProvider!!.getImageFilenameWithExtension(page)
+                var mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                    MimeTypeMap.getFileExtensionFromUrl(filename),
+                )
+                if (mimeType.isNullOrEmpty()) {
+                    mimeType = "image/jpeg"
+                }
 
-        val filename = mGalleryProvider!!.getImageFilenameWithExtension(page)
-        var mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-            MimeTypeMap.getFileExtensionFromUrl(filename),
-        )
-        if (mimeType.isNullOrEmpty()) {
-            mimeType = "image/jpeg"
-        }
+                val realPath: String
+                val resolver = contentResolver
+                val values = ContentValues()
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                values.put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis())
+                values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                if (isAtLeastQ) {
+                    values.put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME,
+                    )
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    realPath = Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME
+                } else {
+                    val path = File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                        AppConfig.APP_DIRNAME,
+                    )
+                    realPath = path.toString()
+                    if (!FileUtils.ensureDirectory(path)) {
+                        Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
+                        return@launchUI
+                    }
+                    values.put(MediaStore.MediaColumns.DATA, path.toString() + File.separator + filename)
+                }
+                val imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                if (imageUri == null) {
+                    Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
+                    return@launchUI
+                }
+                if (!mGalleryProvider!!.save(page, UniFile.fromMediaUri(this@ReaderActivity, imageUri))) {
+                    try {
+                        resolver.delete(imageUri, null, null)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
 
-        val realPath: String
-        val resolver = contentResolver
-        val values = ContentValues()
-        values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-        values.put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis())
-        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            values.put(
-                MediaStore.MediaColumns.RELATIVE_PATH,
-                Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME,
-            )
-            values.put(MediaStore.MediaColumns.IS_PENDING, 1)
-            realPath = Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME
-        } else {
-            val path = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                AppConfig.APP_DIRNAME,
-            )
-            realPath = path.toString()
-            if (!FileUtils.ensureDirectory(path)) {
-                Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-                return
+                    Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
+                    return@launchUI
+                } else if (isAtLeastQ) {
+                    val contentValues = ContentValues()
+                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(imageUri, contentValues, null, null)
+                }
+
+                Toast.makeText(
+                    this@ReaderActivity,
+                    getString(R.string.image_saved, realPath + File.separator + filename),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else {
+                Toast.makeText(this@ReaderActivity, R.string.permission_denied, Toast.LENGTH_SHORT).show()
             }
-            values.put(MediaStore.MediaColumns.DATA, path.toString() + File.separator + filename)
         }
-        val imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        if (imageUri == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!mGalleryProvider!!.save(page, UniFile.fromMediaUri(this, imageUri))) {
-            try {
-                resolver.delete(imageUri, null, null)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val contentValues = ContentValues()
-            contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            resolver.update(imageUri, contentValues, null, null)
-        }
-
-        Toast.makeText(
-            this,
-            getString(R.string.image_saved, realPath + File.separator + filename),
-            Toast.LENGTH_SHORT,
-        ).show()
     }
 
     fun saveImageTo(page: Int) {
