@@ -66,7 +66,8 @@ import com.hippo.ehviewer.ui.setMD3Content
 import com.hippo.ehviewer.ui.tools.CrystalCard
 import com.hippo.ehviewer.ui.tools.Deferred
 import com.hippo.ehviewer.ui.tools.FastScrollLazyColumn
-import com.hippo.ehviewer.ui.tools.rememberDialogState
+import com.hippo.ehviewer.ui.tools.LocalDialogState
+import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.system.pxToDp
 import kotlinx.coroutines.delay
@@ -77,8 +78,7 @@ class HistoryScene : BaseScene() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?) = ComposeWithViewLifecycle().apply {
         setMD3Content {
-            val dialogState = rememberDialogState()
-            dialogState.Intercept()
+            val dialogState = LocalDialogState.current
             val coroutineScope = rememberCoroutineScope()
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             val historyData = remember { Pager(PagingConfig(20, jumpThreshold = 40)) { EhDB.historyLazyList }.flow.cachedIn(lifecycleScope) }.collectAsLazyPagingItems()
@@ -133,33 +133,35 @@ class HistoryScene : BaseScene() {
                                     true
                                 },
                             )
-                            SwipeToDismiss(
-                                state = dismissState,
-                                background = {},
-                                dismissContent = {
-                                    // TODO: item delete & add animation
-                                    // Bug tracker: https://issuetracker.google.com/issues/150812265
-                                    GalleryInfoListItem(
-                                        onClick = {
-                                            navAnimated(
-                                                R.id.galleryDetailScene,
-                                                bundleOf(
-                                                    GalleryDetailScene.KEY_ACTION to GalleryDetailScene.ACTION_GALLERY_INFO,
-                                                    GalleryDetailScene.KEY_GALLERY_INFO to info,
-                                                ),
-                                            )
-                                        },
-                                        onLongClick = {
-                                            coroutineScope.launchIO {
-                                                dialogState.doGalleryInfoAction(info, context)
-                                            }
-                                        },
-                                        info = info,
-                                        modifier = Modifier.height(cardHeight),
-                                    )
-                                },
-                                directions = setOf(DismissDirection.EndToStart),
-                            )
+                            LocalTouchSlopProvider(3f) {
+                                SwipeToDismiss(
+                                    state = dismissState,
+                                    background = {},
+                                    dismissContent = {
+                                        // TODO: item delete & add animation
+                                        // Bug tracker: https://issuetracker.google.com/issues/150812265
+                                        GalleryInfoListItem(
+                                            onClick = {
+                                                navAnimated(
+                                                    R.id.galleryDetailScene,
+                                                    bundleOf(
+                                                        GalleryDetailScene.KEY_ACTION to GalleryDetailScene.ACTION_GALLERY_INFO,
+                                                        GalleryDetailScene.KEY_GALLERY_INFO to info,
+                                                    ),
+                                                )
+                                            },
+                                            onLongClick = {
+                                                coroutineScope.launchIO {
+                                                    dialogState.doGalleryInfoAction(info, context)
+                                                }
+                                            },
+                                            info = info,
+                                            modifier = Modifier.height(cardHeight),
+                                        )
+                                    },
+                                    directions = setOf(DismissDirection.EndToStart),
+                                )
+                            }
                         } else {
                             CrystalCard(
                                 modifier = Modifier
