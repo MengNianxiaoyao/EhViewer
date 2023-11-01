@@ -65,7 +65,7 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 180047
-        versionName = "1.8.11.0"
+        versionName = "1.8.11.1"
         versionNameSuffix = "-SNAPSHOT"
         resourceConfigurations.addAll(
             listOf(

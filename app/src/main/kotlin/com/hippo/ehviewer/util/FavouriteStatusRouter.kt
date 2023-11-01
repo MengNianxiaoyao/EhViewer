@@ -15,11 +15,17 @@
  */
 package com.hippo.ehviewer.util
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisallowComposableCalls
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import com.hippo.ehviewer.EhDB
+import com.hippo.ehviewer.client.data.GalleryInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 
@@ -40,5 +46,11 @@ object FavouriteStatusRouter {
 
     val globalFlow = _globalFlow.asSharedFlow()
 
-    fun stateFlow(targetGid: Long) = globalFlow.transform { (gid, slot) -> if (targetGid == gid) emit(slot) }
+    @Composable
+    inline fun <R> collectAsState(initial: GalleryInfo, crossinline transform: @DisallowComposableCalls (Int) -> R) = remember(initial) {
+        globalFlow.transform { (gid, slot) -> if (initial.gid == gid) emit(slot) }
+            .map { transform(it) }
+        // We cannot use .map(transform) otherwise we will get a strange NPE
+        // TODO: Report to kotlin compiler issue-tracker
+    }.collectAsState(transform(initial.favoriteSlot))
 }
