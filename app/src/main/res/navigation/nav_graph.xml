@@ -53,7 +53,7 @@
         android:label="GalleryCommentsScene" />
     <fragment
         android:id="@+id/galleryPreviewsScene"
-        android:name="com.hippo.ehviewer.ui.scene.GalleryPreviewScreen"
+        android:name="com.hippo.ehviewer.ui.scene.GalleryPreviewFragment"
         android:label="GalleryPreviewsScene" />
     <fragment
         android:id="@+id/nav_favourite"
@@ -61,7 +61,7 @@
         android:label="FavoritesScene" />
     <fragment
         android:id="@+id/nav_history"
-        android:name="com.hippo.ehviewer.ui.scene.HistoryScene"
+        android:name="com.hippo.ehviewer.ui.scene.HistoryFragment"
         android:label="HistoryScene" />
     <fragment
         android:id="@+id/nav_downloads"
@@ -73,7 +73,7 @@
         android:label="SettingsActivity" />
     <fragment
         android:id="@+id/progressScene"
-        android:name="com.hippo.ehviewer.ui.scene.ProgressScene"
+        android:name="com.hippo.ehviewer.ui.scene.ProgressFragment"
         android:label="ProgressScene" />
     <activity
         android:id="@+id/webView"
