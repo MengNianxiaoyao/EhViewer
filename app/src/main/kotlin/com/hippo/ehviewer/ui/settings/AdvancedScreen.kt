@@ -300,6 +300,13 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
             )
             AnimatedVisibility(visible = isEnabledF.value) {
                 SwitchPreference(
+                    title = stringResource(id = R.string.settings_advanced_bypass_vpn_title),
+                    summary = stringResource(id = R.string.settings_advanced_bypass_vpn_summary),
+                    value = Settings::bypassVpn,
+                )
+            }
+            AnimatedVisibility(visible = isEnabledF.value) {
+                SwitchPreference(
                     title = stringResource(id = R.string.settings_advanced_built_in_hosts_title),
                     value = Settings::builtInHosts,
                 )
