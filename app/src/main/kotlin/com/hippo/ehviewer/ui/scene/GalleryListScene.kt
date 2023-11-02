@@ -92,7 +92,6 @@ import com.hippo.ehviewer.ui.legacy.HandlerDrawable
 import com.hippo.ehviewer.ui.legacy.LayoutManagerUtils.firstVisibleItemPosition
 import com.hippo.ehviewer.ui.legacy.ViewTransition
 import com.hippo.ehviewer.ui.legacy.WindowInsetsAnimationHelper
-import com.hippo.ehviewer.ui.setMD3Content
 import com.hippo.ehviewer.ui.settings.showNewVersion
 import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.updater.AppUpdater
@@ -321,7 +320,7 @@ class GalleryListScene : SearchBarScene() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = SceneGalleryListBinding.inflate(inflater, container!!)
-        container.addView(ComposeWithViewLifecycle().apply { setMD3Content { dialogState.Intercept() } })
+        container.addView(ComposeWithMD3 { dialogState.Intercept() })
         checkForUpdates()
         requireActivity().onBackPressedDispatcher.addCallback(stateBackPressedCallback)
         mHideActionFabSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
@@ -996,10 +995,9 @@ class GalleryListScene : SearchBarScene() {
     ) : UrlSuggestion() {
         override val destination = R.id.progressScene
         override val args = bundleOf(
-            ProgressScene.KEY_ACTION to ProgressScene.ACTION_GALLERY_TOKEN,
-            ProgressScene.KEY_GID to gid,
-            ProgressScene.KEY_PTOKEN to pToken,
-            ProgressScene.KEY_PAGE to page,
+            ProgressFragment.KEY_GID to gid,
+            ProgressFragment.KEY_PTOKEN to pToken,
+            ProgressFragment.KEY_PAGE to page,
         )
     }
 
