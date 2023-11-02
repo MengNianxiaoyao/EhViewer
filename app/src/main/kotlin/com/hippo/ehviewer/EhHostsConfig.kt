@@ -59,7 +59,4 @@ val builtInHosts = hostsDsl {
         "151.101.128.133" blockedInCN false
         "151.101.192.133" blockedInCN false
     }
-    hosts("cdn.jsdelivr.net") {
-        "cdn.jsdelivr.net.cdn.cloudflare.net" blockedInCN false
-    }
 }
