@@ -96,6 +96,9 @@ object Settings : DataStorePreferences(null) {
     var cloudflareIp by stringOrNullPref("cloudflare_ip", "cdn.sstatic.net")
     var cloudflareIpOverride by boolPref("cloudflare_ip_override", false)
 
+    // TODO: Remove this after swipe gestures are correctly handled in compose
+    var touchSlopFactor by intPref("touch_slop", 3)
+
     init {
         if ("CN" == Locale.getDefault().country) {
             edit {
