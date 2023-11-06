@@ -109,10 +109,6 @@ android {
             compileOptions {
                 isCoreLibraryDesugaringEnabled = true
             }
-            lint {
-                checkOnly += setOf("InlinedApi", "NewApi", "UnusedAttribute")
-                error += setOf("InlinedApi", "UnusedAttribute")
-            }
         }
         create("gms") {
             dimension = "oss"
@@ -151,9 +147,9 @@ android {
     }
 
     lint {
-        abortOnError = true
-        checkReleaseBuilds = false
-        disable.add("MissingTranslation")
+        baseline = file("lint-baseline.xml")
+        disable += setOf("MissingTranslation", "MissingQuantity")
+        fatal += setOf("NewApi", "InlineApi")
     }
 
     packaging {
@@ -272,8 +268,6 @@ dependencies {
 
     debugImplementation(libs.chucker)
     releaseImplementation(libs.chucker.nop)
-
-    debugImplementation(libs.leakcanary.android)
 
     coreLibraryDesugaring(libs.desugar)
 

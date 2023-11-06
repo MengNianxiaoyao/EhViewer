@@ -24,6 +24,7 @@ import android.content.DialogInterface
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.text.TextUtils.TruncateAt.END
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -993,9 +994,7 @@ class GalleryDetailScene : BaseScene() {
             stringResource(R.string.more_comment)
         }
         CrystalCard {
-            val length = maxShowCount.coerceAtMost(commentsList.size)
-            for (i in 0 until length) {
-                val item = commentsList[i]
+            commentsList.take(maxShowCount).forEach { item ->
                 GalleryCommentCard(
                     modifier = Modifier.padding(vertical = 4.dp),
                     comment = item,
@@ -1016,6 +1015,7 @@ class GalleryDetailScene : BaseScene() {
                     },
                 ) {
                     maxLines = 5
+                    ellipsize = END
                     text = item.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(this))
                 }
             }
