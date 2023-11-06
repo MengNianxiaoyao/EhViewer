@@ -379,8 +379,8 @@
     <string name="settings_advanced_dump_logcat_to">已保存日志至 %s</string>
     <string name="settings_advanced_read_cache_size">阅读缓存大小</string>
     <string name="settings_advanced_app_language_title">App 界面语言</string>
-    <string name="settings_advanced_cronet_integration">[实验性] Cronet 集成</string>
-    <string name="settings_advanced_cronet_integration_summary">使用 Cronet 下载图片（性能更好）</string>
+    <string name="settings_advanced_enable_quic">QUIC 支持</string>
+    <string name="settings_advanced_enable_quic_summary">启用 QUIC 协议支持（需要重启应用）</string>
     <string name="settings_advanced_touch_slop">[实验性] 触摸溢出系数</string>
     <string name="settings_advanced_touch_slop_summary">增大此项将降低滑动手势敏感度</string>
     <string name="settings_advanced_export_data">导出数据</string>

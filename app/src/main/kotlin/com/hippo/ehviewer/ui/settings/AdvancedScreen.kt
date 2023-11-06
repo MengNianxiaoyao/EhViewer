@@ -260,29 +260,29 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                     }
                 }
             }
-            val isEnableCronet = Settings::enableCronet.observed
+            val isEnableQuic = Settings::enableQuic.observed
             val isEnabledF = Settings::dF.observed
             val ifCloudflareIPOverride = Settings::cloudflareIpOverride.observed
             if (isEnabledF.value) {
-                isEnableCronet.value = false
+                isEnableQuic.value = false
             }
-            if (isEnableCronet.value) {
+            if (isEnableQuic.value) {
                 isEnabledF.value = false
             }
             SwitchPreference(
-                title = stringResource(id = R.string.settings_advanced_cronet_integration),
-                summary = stringResource(id = R.string.settings_advanced_cronet_integration_summary),
-                value = isEnableCronet.rememberedAccessor,
+                title = stringResource(id = R.string.settings_advanced_enable_quic),
+                summary = stringResource(id = R.string.settings_advanced_enable_quic_summary),
+                value = isEnableQuic.rememberedAccessor,
                 enabled = !isEnabledF.value,
             )
-            AnimatedVisibility(visible = isEnableCronet.value) {
+            AnimatedVisibility(visible = isEnableQuic.value) {
                 SwitchPreference(
                     title = stringResource(id = R.string.settings_advanced_cloudflare_ip_override),
                     summary = stringResource(id = R.string.settings_advanced_cloudflare_ip_override_summary),
                     value = ifCloudflareIPOverride.rememberedAccessor,
                 )
             }
-            AnimatedVisibility(visible = ifCloudflareIPOverride.value && isEnableCronet.value) {
+            AnimatedVisibility(visible = ifCloudflareIPOverride.value && isEnableQuic.value) {
                 Preference(
                     title = cloudflareIPtitle,
                     summary = Settings.cloudflareIp,
@@ -303,7 +303,7 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                 title = stringResource(id = R.string.settings_advanced_domain_fronting_title),
                 summary = stringResource(id = R.string.settings_advanced_domain_fronting_summary),
                 value = isEnabledF.rememberedAccessor,
-                enabled = !isEnableCronet.value,
+                enabled = !isEnableQuic.value,
             )
             AnimatedVisibility(visible = isEnabledF.value) {
                 SwitchPreference(
