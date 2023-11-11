@@ -68,6 +68,7 @@ import com.hippo.ehviewer.client.data.FavListUrlBuilder
 import com.hippo.ehviewer.client.ehUrl
 import com.hippo.ehviewer.databinding.SceneFavoritesBinding
 import com.hippo.ehviewer.ui.CommonOperations
+import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.legacy.AddDeleteDrawable
 import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
 import com.hippo.ehviewer.ui.legacy.FabLayout
@@ -224,7 +225,8 @@ class FavoritesScene : SearchBarScene() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = SceneFavoritesBinding.inflate(inflater, container!!)
-        container.addView(ComposeWithMD3 { dialogState.Intercept() })
+        val stub = ComposeWithMD3 { dialogState.Intercept() }
+        container.addView(stub)
         setOnApplySearch {
             if (!tracker.isInCustomChoice) {
                 switchFav(urlBuilder.favCat, it)
@@ -237,7 +239,7 @@ class FavoritesScene : SearchBarScene() {
             updateJumpFab()
             val colorID = theme.resolveColor(com.google.android.material.R.attr.colorOnSurface)
             val addDelete = AddDeleteDrawable(context, colorID)
-            primaryFab!!.setImageDrawable(addDelete)
+            primaryFab.setImageDrawable(addDelete)
             setExpanded(expanded = false, animation = false)
             setAutoCancel(true)
             setHidePrimaryFab(false)
@@ -294,9 +296,9 @@ class FavoritesScene : SearchBarScene() {
             })
             addOnExpandListener {
                 if (it) {
-                    addDelete.setDelete(ANIMATE_TIME)
+                    addDelete.setDelete(FabLayout.ANIMATE_TIME)
                 } else {
-                    addDelete.setAdd(ANIMATE_TIME)
+                    addDelete.setAdd(FabLayout.ANIMATE_TIME)
                     if (tracker.isInCustomChoice) tracker.clearSelection()
                 }
             }
@@ -467,16 +469,19 @@ class FavoritesScene : SearchBarScene() {
                 }
             }
         }
+    }.apply {
+        val compositionContext = (requireActivity() as MainActivity).compositionContext!!
+        setParentCompositionContext(compositionContext)
     }
 
     override fun onSearchViewExpanded() {
-        hideActionFab(true)
+        binding.fabLayout.hide()
         super.onSearchViewExpanded()
     }
 
     override fun onSearchViewHidden() {
         super.onSearchViewHidden()
-        showActionFab(true)
+        binding.fabLayout.show(delay = SEARCH_VIEW_ANIMATE_TIME)
     }
 
     private fun showGoToDialog() {
