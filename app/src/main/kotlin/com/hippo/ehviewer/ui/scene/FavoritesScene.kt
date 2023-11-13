@@ -20,8 +20,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderSpecial
 import androidx.compose.material3.ElevatedCard
@@ -67,13 +68,10 @@ import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhEngine
-import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
 import com.hippo.ehviewer.client.data.FavListUrlBuilder
-import com.hippo.ehviewer.client.ehUrl
 import com.hippo.ehviewer.databinding.SceneFavoritesBinding
 import com.hippo.ehviewer.ui.CommonOperations
-import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.legacy.AddDeleteDrawable
 import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
 import com.hippo.ehviewer.ui.legacy.FabLayout
@@ -429,8 +427,8 @@ class FavoritesScene : SearchBarScene() {
         )
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
+    override fun onRelease() {
+        super.onRelease()
         binding.recyclerView.stopScroll()
         mAdapter = null
         _binding = null
@@ -457,8 +455,8 @@ class FavoritesScene : SearchBarScene() {
             } else {
                 arrayOf(localFav)
             }
-            LazyColumn {
-                itemsIndexed(faves) { index, (name, count) ->
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                faves.forEachIndexed { index, (name, count) ->
                     ListItem(
                         headlineContent = { Text(text = name) },
                         trailingContent = { Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge) },
@@ -467,9 +465,6 @@ class FavoritesScene : SearchBarScene() {
                 }
             }
         }
-    }.apply {
-        val compositionContext = (requireActivity() as MainActivity).compositionContext!!
-        setParentCompositionContext(compositionContext)
     }
 
     override fun onSearchViewExpanded() {
@@ -542,11 +537,12 @@ class FavoritesScene : SearchBarScene() {
         override fun onClick(dialog: DialogInterface, which: Int) {
             val info = takeCheckedInfo()
             lifecycleScope.launchIO {
-                if (urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL) { // Delete local fav
+                val srcCat = urlBuilder.favCat
+                if (srcCat == FavListUrlBuilder.FAV_CAT_LOCAL) { // Delete local fav
                     EhDB.removeLocalFavorites(info)
                 } else {
-                    val delList = info.map { it.gid to it.token!! }
-                    EhEngine.modifyFavoritesRange(delList, -1)
+                    val delList = info.map { it.gid }.toLongArray()
+                    EhEngine.modifyFavorites(delList, srcCat, -1)
                 }
                 mAdapter?.refresh()
             }
@@ -569,7 +565,7 @@ class FavoritesScene : SearchBarScene() {
                     EhDB.removeLocalFavorites(info)
                     val galleryList = info.map { it.gid to it.token!! }
                     runCatching {
-                        EhEngine.modifyFavoritesRange(galleryList, dstCat)
+                        EhEngine.addFavorites(galleryList, dstCat)
                     }
                 } else if (dstCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
                     // Move from cloud to local
@@ -577,9 +573,8 @@ class FavoritesScene : SearchBarScene() {
                 } else {
                     // Move from cloud to cloud
                     val gidArray = info.map { it.gid }.toLongArray()
-                    val url = ehUrl { addPathSegments(EhUrl.FAV_PATH) }.toString()
                     runCatching {
-                        EhEngine.modifyFavorites(url, gidArray, dstCat)
+                        EhEngine.modifyFavorites(gidArray, srcCat, dstCat)
                     }
                 }
                 mAdapter?.refresh()

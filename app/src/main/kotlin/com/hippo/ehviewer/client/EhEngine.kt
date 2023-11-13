@@ -21,6 +21,7 @@ import arrow.fx.coroutines.parZip
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
+import com.hippo.ehviewer.client.data.FavListUrlBuilder
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.client.exception.EhException
 import com.hippo.ehviewer.client.exception.InsufficientFundsException
@@ -120,13 +121,23 @@ private fun rethrowExactly(code: Int, body: String, e: Throwable): Nothing {
 
 val httpContentPool = DirectByteBufferPool(8, 0x80000)
 
-suspend inline fun <T> fetchCompat(
+suspend fun <T> fetchCompat(
     url: String,
     referer: String? = null,
     origin: String? = null,
     reqBody: RequestBody? = null,
-    crossinline parser: suspend (ByteBuffer) -> T,
+    parser: suspend (ByteBuffer) -> T,
 ): T {
+    fun commonChecks(body: ByteBuffer) {
+        // Check sad panda(without panda)
+        if (!body.hasRemaining()) {
+            if (EhUtils.isExHentai) {
+                throw EhException("Sad Panda\n(without panda)")
+            } else {
+                throw EhException("IP banned")
+            }
+        }
+    }
     return if (isCronetSupported) {
         cronetRequest(url, referer, origin) {
             reqBody?.let { withRequestBody(it) }
@@ -134,6 +145,7 @@ suspend inline fun <T> fetchCompat(
             httpContentPool.useInstance { buffer ->
                 awaitBodyFully(buffer)
                 buffer.flip()
+                commonChecks(buffer)
                 parser(buffer)
             }
         }
@@ -146,6 +158,7 @@ suspend inline fun <T> fetchCompat(
                     if (body.source().read(buffer) == -1) break
                 }
                 buffer.flip()
+                commonChecks(buffer)
                 parser(buffer)
             }
         }
@@ -276,31 +289,21 @@ object EhEngine {
         GalleryDetailParser.parseComments(document)
     }
 
-    /**
-     * @param dstCat -1 for delete, 0 - 9 for cloud favorite, others throw Exception
-     * @param note   max 250 characters
-     */
-    suspend fun modifyFavorites(
-        gid: Long,
-        token: String?,
-        dstCat: Int = -1,
-        note: String = "",
-    ) {
+    suspend fun modifyFavorites(gid: Long, token: String?, dstCat: Int = -1, note: String = "") {
         val catStr: String = when (dstCat) {
             -1 -> "favdel"
             in 0..9 -> dstCat.toString()
             else -> throw EhException("Invalid dstCat: $dstCat")
         }
         val url = EhUrl.getAddFavorites(gid, token)
-        return ehRequest(url, url, EhUrl.origin) {
-            formBody {
-                add("favcat", catStr)
-                add("favnote", note)
-                // apply=Add+to+Favorites is not necessary, just use apply=Apply+Changes all the time
-                add("apply", "Apply Changes")
-                add("update", "1")
-            }
-        }.executeAndParsingWith { }
+        val body = formBody {
+            add("favcat", catStr)
+            add("favnote", note)
+            // apply=Add+to+Favorites is not necessary, just use apply=Apply+Changes all the time
+            add("apply", "Apply Changes")
+            add("update", "1")
+        }
+        fetchCompat(url, url, EhUrl.origin, body) { }
     }
 
     suspend fun downloadArchive(
@@ -353,7 +356,13 @@ object EhEngine {
         }
     }.executeAndParsingWith(HomeParser::parseResetLimits)
 
-    suspend fun modifyFavorites(url: String, gidArray: LongArray, dstCat: Int): FavoritesParser.Result {
+    suspend fun modifyFavorites(gidArray: LongArray, srcCat: Int, dstCat: Int): FavoritesParser.Result {
+        val url = ehUrl {
+            addPathSegments(EhUrl.FAV_PATH)
+            if (FavListUrlBuilder.isValidFavCat(srcCat)) {
+                addQueryParameter("favcat", srcCat.toString())
+            }
+        }.toString()
         val catStr: String = when (dstCat) {
             -1 -> "delete"
             in 0..9 -> "fav$dstCat"
@@ -514,7 +523,7 @@ object EhEngine {
         if (filter) list.removeAllSuspend { EhFilter.filterUploader(it) || EhFilter.filterTag(it) || EhFilter.filterTagNamespace(it) }
     }
 
-    suspend fun modifyFavoritesRange(galleryList: List<Pair<Long, String>>, dstCat: Int) {
-        galleryList.forEach { (gid, token) -> modifyFavorites(gid, token, dstCat) }
+    suspend fun addFavorites(galleryList: List<Pair<Long, String>>, dstCat: Int) {
+        galleryList.parMap(concurrency = Settings.multiThreadDownload) { (gid, token) -> modifyFavorites(gid, token, dstCat) }
     }
 }
