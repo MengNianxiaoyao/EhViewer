@@ -198,7 +198,6 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.browser)
-    implementation(libs.androidx.collection)
 
     // https://developer.android.com/jetpack/androidx/releases/compose-material3
     api(platform(libs.compose.bom))
@@ -248,6 +247,8 @@ dependencies {
 
     implementation(libs.okio.jvm)
 
+    implementation(libs.diff)
+
     implementation(libs.aboutlibraries.core)
 
     implementation(libs.insetter) // Dead Dependency
@@ -274,6 +275,14 @@ dependencies {
     coreLibraryDesugaring(libs.desugar)
 
     "gmsImplementation"(libs.bundles.cronet)
+}
+
+configurations.all {
+    resolutionStrategy {
+        // Workaround IME won't show again once hidden.
+        // Google issue-tracker link?
+        force("androidx.compose.ui:ui-text-android:1.6.0-alpha08")
+    }
 }
 
 kotlin {

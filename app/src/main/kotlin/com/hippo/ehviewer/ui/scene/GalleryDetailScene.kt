@@ -137,7 +137,6 @@ import com.hippo.ehviewer.download.DownloadManager as EhDownloadManager
 import com.hippo.ehviewer.ktbuilder.imageRequest
 import com.hippo.ehviewer.spider.SpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.MODE_READ
-import com.hippo.ehviewer.ui.CommonOperations
 import com.hippo.ehviewer.ui.GalleryInfoBottomSheet
 import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.getFavoriteIcon
@@ -156,6 +155,7 @@ import com.hippo.ehviewer.ui.modifyFavorites
 import com.hippo.ehviewer.ui.navToReader
 import com.hippo.ehviewer.ui.openBrowser
 import com.hippo.ehviewer.ui.scene.GalleryListScene.Companion.toStartArgs
+import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.CrystalCard
 import com.hippo.ehviewer.ui.tools.FilledTertiaryIconButton
 import com.hippo.ehviewer.ui.tools.FilledTertiaryIconToggleButton
@@ -173,6 +173,7 @@ import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.requestPermission
 import com.ramcosta.composedestinations.annotation.Destination
 import eu.kanade.tachiyomi.util.lang.launchIO
+import eu.kanade.tachiyomi.util.lang.launchUI
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import kotlin.math.roundToInt
@@ -528,7 +529,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                     ) {
                         maxLines = 5
                         ellipsize = END
-                        text = item.comment.orEmpty().parseAsHtml(imageGetter = CoilImageGetter(this))
+                        text = item.comment.parseAsHtml(imageGetter = CoilImageGetter(this))
                     }
                 }
                 Box(
@@ -583,10 +584,8 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         ) {
-            val favored by FavouriteStatusRouter.collectAsState(galleryDetail) {
-                it != NOT_FAVORITED
-            }
-            val favButtonText = if (favored) {
+            val favSlot by FavouriteStatusRouter.collectAsState(galleryDetail) { it }
+            val favButtonText = if (favSlot != NOT_FAVORITED) {
                 galleryDetail.favoriteName ?: stringResource(id = R.string.local_favorites)
             } else {
                 stringResource(id = R.string.not_favorited)
@@ -594,7 +593,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
             val favoritesLock = remember { Mutex() }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 FilledTertiaryIconToggleButton(
-                    checked = favored,
+                    checked = favSlot != NOT_FAVORITED,
                     onCheckedChange = {
                         coroutineScope.launchIO {
                             favoritesLock.withLock {
@@ -620,7 +619,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                     },
                 ) {
                     Icon(
-                        imageVector = getFavoriteIcon(favored),
+                        imageVector = getFavoriteIcon(favSlot != NOT_FAVORITED),
                         contentDescription = null,
                     )
                 }
@@ -994,11 +993,9 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
         val onDownloadButtonClick = rememberLambda(galleryInfo) {
             galleryDetail ?: return@rememberLambda
             if (EhDownloadManager.getDownloadState(galleryDetail.gid) == DownloadInfo.STATE_INVALID) {
-                CommonOperations.startDownload(
-                    activity,
-                    galleryDetail.galleryInfo,
-                    false,
-                )
+                coroutineScope.launchUI {
+                    dialogState.startDownload(activity, false, galleryDetail.galleryInfo)
+                }
             } else {
                 class DeleteDialogHelper(
                     private val mGalleryInfo: GalleryInfo,

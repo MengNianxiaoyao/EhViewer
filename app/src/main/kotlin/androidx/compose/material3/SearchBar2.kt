@@ -207,6 +207,7 @@ fun SearchBar(
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,
         modifier = modifier
+            .padding(horizontal = lerp(SearchBarHorizontalPadding, 0.dp, animationProgress.value))
             .zIndex(1f)
             .onConsumedWindowInsetsChanged { consumedInsets ->
                 unconsumedInsets.insets = windowInsets.exclude(consumedInsets)
@@ -418,7 +419,7 @@ private fun SearchBarInputField(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         interactionSource = interactionSource,
-        decorationBox = @Composable { innerTextField ->
+        decorator = @Composable { innerTextField ->
             TextFieldDefaults.DecorationBox(
                 value = state.text.toString(),
                 innerTextField = innerTextField,
@@ -463,6 +464,7 @@ private val SearchBarCornerRadius: Dp = InputFieldHeight / 2
 internal val SearchBarMinWidth: Dp = 360.dp
 private val SearchBarMaxWidth: Dp = 720.dp
 internal val SearchBarVerticalPadding: Dp = 8.dp
+internal val SearchBarHorizontalPadding: Dp = 16.dp
 
 // Search bar has 16dp padding between icons and start/end, while by default text field has 12dp.
 private val SearchBarIconOffsetX: Dp = 4.dp
