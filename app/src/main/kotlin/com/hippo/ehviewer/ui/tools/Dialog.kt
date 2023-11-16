@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -200,7 +202,7 @@ class DialogState {
                     cont.resume(it)
                 }
             }
-            AlertDialog(
+            BasicAlertDialog(
                 onDismissRequest = { cont.cancel() },
                 properties = DialogProperties(usePlatformDefaultWidth = respectDefaultWidth),
                 content = {
@@ -265,6 +267,53 @@ class DialogState {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    suspend fun showSelectItemWithCheckBox(
+        vararg items: String?,
+        @StringRes title: Int,
+        @StringRes checkBoxText: Int,
+    ) = showSelectItemWithCheckBox(
+        *items.filterNotNull().mapIndexed { a, b -> b to a }.toTypedArray(),
+        title = title,
+        checkBoxText = checkBoxText,
+    )
+
+    private suspend fun <R> showSelectItemWithCheckBox(
+        vararg items: Pair<String, R>,
+        @StringRes title: Int,
+        @StringRes checkBoxText: Int,
+    ): Pair<R, Boolean> = showNoButton {
+        var checked by remember { mutableStateOf(false) }
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+                text = stringResource(id = title),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            LazyColumn {
+                items(items) { (text, item) ->
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.tertiary) {
+                        Text(
+                            text = text,
+                            modifier = Modifier.clickable { dismissWith(item to checked) }.fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.clickable { checked = !checked }.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = checked,
+                    onCheckedChange = { checked = !checked },
+                )
+                Text(text = stringResource(checkBoxText))
             }
         }
     }
