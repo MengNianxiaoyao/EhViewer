@@ -95,6 +95,7 @@ object Settings : DataStorePreferences(null) {
     var lastUpdateDay by longPref("last_update_day", 0)
     var cloudflareIp by stringOrNullPref("cloudflare_ip", "cdn.sstatic.net")
     var cloudflareIpOverride by boolPref("cloudflare_ip_override", false)
+    var favDialogTheta by floatPref("fav_select_dialog_delta", 0F)
 
     // TODO: Remove this after swipe gestures are correctly handled in compose
     var touchSlopFactor by intPref("touch_slop", 3)
