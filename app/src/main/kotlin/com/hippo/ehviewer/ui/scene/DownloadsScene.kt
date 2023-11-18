@@ -60,8 +60,8 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachReversed
 import androidx.core.content.ContextCompat
+import androidx.core.os.bundleOf
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -110,8 +110,8 @@ import com.hippo.ehviewer.ui.setMD3Content
 import com.hippo.ehviewer.ui.tools.CropDefaults
 import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.util.FileUtils
-import com.hippo.ehviewer.util.LongList
 import com.hippo.ehviewer.util.containsIgnoreCase
+import com.hippo.ehviewer.util.mapToLongArray
 import com.hippo.ehviewer.util.sendTo
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.util.lang.launchIO
@@ -446,12 +446,8 @@ class DownloadsScene :
                     expanded = false
                     val list = mList ?: return@DropdownMenuItem
                     val activity = requireActivity()
-                    val gidList = LongList()
-                    list.fastForEachReversed { info ->
-                        if (info.state != DownloadInfo.STATE_FINISH) {
-                            gidList.add(info.gid)
-                        }
-                    }
+                    val gidList = list.filter { it.state != DownloadInfo.STATE_FINISH }
+                        .asReversed().mapToLongArray(DownloadInfo::gid)
                     val intent = Intent(activity, DownloadService::class.java)
                     intent.action = DownloadService.ACTION_START_RANGE
                     intent.putExtra(DownloadService.KEY_GID_LIST, gidList)
@@ -552,7 +548,7 @@ class DownloadsScene :
         } else {
             val downloadInfoList = tracker.getAndClearSelection()
             val gidList = if (position in 1..3) {
-                LongList(downloadInfoList.map(DownloadInfo::gid).toMutableList())
+                downloadInfoList.mapToLongArray(DownloadInfo::gid)
             } else {
                 null
             }
@@ -689,7 +685,7 @@ class DownloadsScene :
 
     private inner class DeleteRangeDialogHelper(
         private val mDownloadInfoList: List<DownloadInfo>,
-        private val mGidList: LongList,
+        private val mGidList: LongArray,
         private val mBuilder: CheckBoxDialogBuilder,
     ) : DialogInterface.OnClickListener {
         override fun onClick(dialog: DialogInterface, which: Int) {
@@ -773,13 +769,10 @@ class DownloadsScene :
             }
             when (v) {
                 binding.thumb -> {
-                    val args = Bundle()
-                    args.putString(
-                        GalleryDetailScene.KEY_ACTION,
-                        GalleryDetailScene.ACTION_GALLERY_INFO,
+                    navAnimated(
+                        R.id.galleryDetailScene,
+                        bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(list[index].galleryInfo)),
                     )
-                    args.putParcelable(GalleryDetailScene.KEY_GALLERY_INFO, list[index].galleryInfo)
-                    navAnimated(R.id.galleryDetailScene, args)
                 }
 
                 binding.start -> {
