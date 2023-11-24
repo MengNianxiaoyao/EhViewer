@@ -31,22 +31,18 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
@@ -74,6 +70,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.currentRecomposeScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -110,7 +107,7 @@ import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
 import com.hippo.ehviewer.ui.legacy.EditTextDialogBuilder
 import com.hippo.ehviewer.ui.scene.BaseScene
 import com.hippo.ehviewer.ui.scene.GalleryDetailScene
-import com.hippo.ehviewer.ui.scene.GalleryListScene.Companion.toStartArgs
+import com.hippo.ehviewer.ui.scene.GalleryListFragment.Companion.toStartArgs
 import com.hippo.ehviewer.ui.scene.ProgressFragment
 import com.hippo.ehviewer.ui.scene.TokenArgs
 import com.hippo.ehviewer.ui.scene.navAnimated
@@ -157,21 +154,13 @@ class MainActivity : EhActivity() {
     private val availableNetworks = mutableListOf<Network>()
     private val isInitializedFlow = MutableStateFlow(false)
 
-    private var sideSheet by mutableStateOf<(@Composable ColumnScope.(DrawerState2) -> Unit)?>(null)
+    private var sideSheet = mutableStateListOf<@Composable ColumnScope.(DrawerState2) -> Unit>()
 
     @Composable
     fun ProvideSideSheetContent(content: @Composable ColumnScope.(DrawerState2) -> Unit) {
         DisposableEffect(content) {
-            require(sideSheet == null) {
-                "Provide SideSheet content when previous content not released!!!"
-            }
-            sideSheet = content
-            onDispose {
-                require(sideSheet == content) {
-                    "Try to release SideSheetContent not belong to us"
-                }
-                sideSheet = null
-            }
+            sideSheet.add(0, content)
+            onDispose { sideSheet.remove(content) }
         }
     }
 
@@ -315,9 +304,6 @@ class MainActivity : EhActivity() {
                     recomposeScope.invalidate()
                 }
             }
-            BackHandler(drawerState.isOpen) {
-                closeDrawer()
-            }
             LocalTouchSlopProvider(Settings.touchSlopFactor.toFloat()) {
                 ModalNavigationDrawer(
                     drawerContent = {
@@ -363,16 +349,11 @@ class MainActivity : EhActivity() {
                     drawerState = drawerState,
                     gesturesEnabled = !drawerLocked || drawerState.isOpen,
                 ) {
-                    val sheet = sideSheet
+                    val sheet = sideSheet.firstOrNull()
                     val sideDrawerState = rememberDrawerState(DrawerValue.Closed)
                     LaunchedEffect(Unit) {
                         openSideSheetFlow.collectLatest {
                             sideDrawerState.open()
-                        }
-                    }
-                    BackHandler(sideDrawerState.isOpen) {
-                        scope.launch {
-                            sideDrawerState.close()
                         }
                     }
                     SideDrawer(
@@ -381,7 +362,6 @@ class MainActivity : EhActivity() {
                                 ModalDrawerSheet(
                                     modifier = Modifier.widthIn(max = (configuration.screenWidthDp - 112).dp),
                                     drawerShape = ShapeDefaults.Large.copy(topEnd = CornerSize(0), bottomEnd = CornerSize(0)),
-                                    windowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.End),
                                 ) {
                                     sheet(sideDrawerState)
                                 }
