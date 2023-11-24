@@ -39,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ShapeDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -148,59 +149,7 @@ fun FavouritesScreen(navigator: NavController) {
     val coroutineScope = rememberCoroutineScope()
     val localFavCountFlow = rememberInVM { EhDB.localFavCount }
     val searchBarHint = stringResource(R.string.search_bar_hint, favCatName)
-
-    fun switchFav(newCat: Int, keyword: String? = null) {
-        urlBuilder = urlBuilder.copy(
-            keyword = keyword,
-            favCat = newCat,
-            jumpTo = null,
-        ).apply { setIndex(null, true) }
-        Settings.recentFavCat = urlBuilder.favCat
-    }
-
-    with(activity) {
-        ProvideSideSheetContent { sheetState ->
-            val localFavCount by localFavCountFlow.collectAsState(0)
-            TopAppBar(
-                title = { Text(text = stringResource(id = R.string.collections)) },
-                windowInsets = WindowInsets(0, 0, 0, 0),
-            )
-            val scope = currentRecomposeScope
-            LaunchedEffect(Unit) {
-                Settings.favChangesFlow.collect {
-                    scope.invalidate()
-                }
-            }
-            val localFav = stringResource(id = R.string.local_favorites) to localFavCount
-            val faves = if (EhCookieStore.hasSignedIn()) {
-                arrayOf(
-                    localFav,
-                    stringResource(id = R.string.cloud_favorites) to Settings.favCloudCount,
-                    *Settings.favCat.zip(Settings.favCount.toTypedArray()).toTypedArray(),
-                )
-            } else {
-                arrayOf(localFav)
-            }
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom)),
-            ) {
-                faves.forEachIndexed { index, (name, count) ->
-                    ListItem(
-                        headlineContent = { Text(text = name) },
-                        trailingContent = { Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge) },
-                        modifier = Modifier.clickable {
-                            switchFav(index - 2)
-                            coroutineScope.launch { sheetState.close() }
-                        },
-                    )
-                }
-            }
-        }
-    }
-
-    val searchFieldState = rememberTextFieldState()
-    val data = rememberInVM(urlBuilder) {
+    val data = rememberInVM(urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
         if (urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
             Pager(PagingConfig(20, jumpThreshold = 40)) {
                 if (keyword.isBlank()) {
@@ -244,13 +193,63 @@ fun FavouritesScreen(navigator: NavController) {
         }.flow.cachedIn(viewModelScope)
     }.collectAsLazyPagingItems()
 
+    fun refresh(newUrlBuilder: FavListUrlBuilder = urlBuilder.copy(jumpTo = null, prev = null, next = null)) {
+        urlBuilder = newUrlBuilder
+        data.refresh()
+    }
+
+    with(activity) {
+        ProvideSideSheetContent { sheetState ->
+            val localFavCount by localFavCountFlow.collectAsState(0)
+            TopAppBar(
+                title = { Text(text = stringResource(id = R.string.collections)) },
+                windowInsets = WindowInsets(0, 0, 0, 0),
+            )
+            val scope = currentRecomposeScope
+            LaunchedEffect(Unit) {
+                Settings.favChangesFlow.collect {
+                    scope.invalidate()
+                }
+            }
+            val localFav = stringResource(id = R.string.local_favorites) to localFavCount
+            val faves = if (EhCookieStore.hasSignedIn()) {
+                arrayOf(
+                    localFav,
+                    stringResource(id = R.string.cloud_favorites) to Settings.favCloudCount,
+                    *Settings.favCat.zip(Settings.favCount.toTypedArray()).toTypedArray(),
+                )
+            } else {
+                arrayOf(localFav)
+            }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom)),
+            ) {
+                faves.forEachIndexed { index, (name, count) ->
+                    ListItem(
+                        headlineContent = { Text(text = name) },
+                        trailingContent = { Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge) },
+                        modifier = Modifier.clickable {
+                            val newCat = index - 2
+                            refresh(FavListUrlBuilder(newCat))
+                            Settings.recentFavCat = newCat
+                            coroutineScope.launch { sheetState.close() }
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    val searchFieldState = rememberTextFieldState()
+
     val refreshState = rememberPullToRefreshState {
         data.loadState.refresh is LoadState.NotLoading
     }
 
     if (refreshState.isRefreshing) {
         LaunchedEffect(Unit) {
-            data.refresh()
+            refresh()
         }
     }
 
@@ -277,7 +276,7 @@ fun FavouritesScreen(navigator: NavController) {
         title = title,
         searchFieldState = searchFieldState,
         searchFieldHint = searchBarHint,
-        onApplySearch = { switchFav(urlBuilder.favCat, it) },
+        onApplySearch = { refresh(FavListUrlBuilder(urlBuilder.favCat, it)) },
         onSearchExpanded = { hidden = true },
         onSearchHidden = { hidden = false },
         refreshState = refreshState,
@@ -301,33 +300,6 @@ fun FavouritesScreen(navigator: NavController) {
             Settings.listModeBackField.valueFlow()
         }.collectAsState(Settings.listMode)
         Box(modifier = Modifier.fillMaxSize()) {
-            when (val state = data.loadState.refresh) {
-                is LoadState.Loading -> if (data.itemCount == 0) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                is LoadState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center).widthIn(max = 228.dp)
-                            .clip(ShapeDefaults.Small).clickable { data.retry() },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = EhIcons.Big.Default.SadAndroid,
-                            contentDescription = null,
-                            modifier = Modifier.padding(16.dp).size(120.dp),
-                            tint = MaterialTheme.colorScheme.tertiary,
-                        )
-                        Text(
-                            text = ExceptionUtils.getReadableString(state.error),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                is LoadState.NotLoading -> SideEffect {
-                    refreshState.endRefresh()
-                }
-            }
             if (listMode == 0) {
                 val height = (3 * Settings.listThumbSize * 3).pxToDp.dp
                 val showPages = Settings.showGalleryPages
@@ -417,6 +389,62 @@ fun FavouritesScreen(navigator: NavController) {
                     }
                 }
             }
+
+            var refreshing by remember { mutableStateOf(false) }
+            when (val state = data.loadState.refresh) {
+                is LoadState.Loading -> if (!refreshState.isRefreshing) {
+                    Surface {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else {
+                    refreshing = true
+                }
+                is LoadState.Error -> {
+                    Surface {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(
+                                modifier = Modifier.widthIn(max = 228.dp)
+                                    .clip(ShapeDefaults.Small).clickable { data.retry() },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Icon(
+                                    imageVector = EhIcons.Big.Default.SadAndroid,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(16.dp).size(120.dp),
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                )
+                                Text(
+                                    text = ExceptionUtils.getReadableString(state.error),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                    SideEffect {
+                        if (refreshing) {
+                            refreshState.endRefresh()
+                            refreshing = false
+                        }
+                    }
+                }
+                is LoadState.NotLoading -> SideEffect {
+                    // Don't use `refreshState.isRefreshing` here because recomposition may happen
+                    // before loading state changes
+                    if (refreshing) {
+                        refreshState.endRefresh()
+                        refreshing = false
+                    }
+                }
+            }
         }
     }
 
@@ -453,14 +481,14 @@ fun FavouritesScreen(navigator: NavController) {
                 datePicker.addOnPositiveButtonClickListener { time: Long ->
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US).withZone(ZoneOffset.UTC)
                     val jumpTo = formatter.format(Instant.ofEpochMilli(time))
-                    urlBuilder = urlBuilder.copy(jumpTo = jumpTo)
+                    refresh(urlBuilder.copy(jumpTo = jumpTo))
                 }
             }
             onClick(Icons.Default.Refresh) {
-                switchFav(urlBuilder.favCat)
+                refresh()
             }
             onClick(Icons.AutoMirrored.Default.LastPage) {
-                urlBuilder = urlBuilder.copy().apply { setIndex("1-0", false) }
+                refresh(urlBuilder.copy(jumpTo = null, prev = "1-0", next = null))
             }
         } else {
             onClick(Icons.Default.DoneAll) {
