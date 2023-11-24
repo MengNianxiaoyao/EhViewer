@@ -22,6 +22,7 @@ import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -63,13 +65,11 @@ import androidx.paging.compose.itemKey
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
-import com.hippo.ehviewer.Settings.listThumbSize
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.big.History
 import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.doGalleryInfoAction
 import com.hippo.ehviewer.ui.main.GalleryInfoListItem
-import com.hippo.ehviewer.ui.tools.CrystalCard
 import com.hippo.ehviewer.ui.tools.Deferred
 import com.hippo.ehviewer.ui.tools.FastScrollLazyColumn
 import com.hippo.ehviewer.ui.tools.LocalDialogState
@@ -78,7 +78,6 @@ import com.hippo.ehviewer.ui.tools.rememberInVM
 import com.hippo.ehviewer.util.findActivity
 import com.ramcosta.composedestinations.annotation.Destination
 import eu.kanade.tachiyomi.util.lang.launchIO
-import eu.kanade.tachiyomi.util.system.pxToDp
 import kotlinx.coroutines.delay
 
 @Destination
@@ -120,7 +119,7 @@ fun HistoryScreen(navigator: NavController) {
             )
         },
     ) { paddingValues ->
-        val cardHeight = remember { (3 * listThumbSize * 3).pxToDp.dp }
+        val cardHeight by collectListThumbSizeAsState()
         FastScrollLazyColumn(
             modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.gallery_list_margin_h)),
             contentPadding = paddingValues,
@@ -147,30 +146,28 @@ fun HistoryScreen(navigator: NavController) {
                         SwipeToDismissBox(
                             state = dismissState,
                             backgroundContent = {},
-                            content = {
-                                // TODO: item delete & add animation
-                                // Bug tracker: https://issuetracker.google.com/issues/150812265
-                                GalleryInfoListItem(
-                                    onClick = {
-                                        navigator.navAnimated(
-                                            R.id.galleryDetailScene,
-                                            bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(info)),
-                                        )
-                                    },
-                                    onLongClick = {
-                                        coroutineScope.launchIO {
-                                            dialogState.doGalleryInfoAction(info, context)
-                                        }
-                                    },
-                                    info = info,
-                                    modifier = Modifier.height(cardHeight),
-                                )
-                            },
+                            modifier = Modifier.animateItemPlacement(),
                             directions = setOf(DismissDirection.EndToStart),
-                        )
+                        ) {
+                            GalleryInfoListItem(
+                                onClick = {
+                                    navigator.navAnimated(
+                                        R.id.galleryDetailScene,
+                                        bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(info)),
+                                    )
+                                },
+                                onLongClick = {
+                                    coroutineScope.launchIO {
+                                        dialogState.doGalleryInfoAction(info, context)
+                                    }
+                                },
+                                info = info,
+                                modifier = Modifier.height(cardHeight),
+                            )
+                        }
                     }
                 } else {
-                    CrystalCard(modifier = Modifier.height(cardHeight).fillMaxWidth()) {}
+                    Spacer(modifier = Modifier.height(cardHeight).fillMaxWidth())
                 }
             }
         }

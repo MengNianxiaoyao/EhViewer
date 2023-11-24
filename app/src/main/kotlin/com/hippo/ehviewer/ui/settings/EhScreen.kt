@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.text.parseAsHtml
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.asMutableState
 import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhEngine
 import com.hippo.ehviewer.client.EhTagDatabase
@@ -236,27 +237,27 @@ fun EhScreen(navigator: DestinationsNavigator) {
                 title = stringResource(id = R.string.settings_eh_list_mode),
                 entry = R.array.list_mode_entries,
                 entryValueRes = R.array.list_mode_entry_values,
-                value = Settings::listMode.observed,
+                value = Settings.listMode.asMutableState(),
             )
             IntSliderPreference(
                 maxValue = 60,
                 minValue = 20,
                 step = 7,
                 title = stringResource(id = R.string.list_tile_thumb_size),
-                value = Settings::listThumbSize,
+                value = Settings.listThumbSize::value,
             )
             SimpleMenuPreferenceInt(
                 title = stringResource(id = R.string.settings_eh_detail_size),
                 entry = R.array.detail_size_entries,
                 entryValueRes = R.array.detail_size_entry_values,
-                value = Settings::detailSize.observed,
+                value = Settings.detailSize.asMutableState(),
             )
             IntSliderPreference(
                 maxValue = 400,
                 minValue = 80,
                 step = 7,
                 title = stringResource(id = R.string.settings_eh_thumb_size),
-                value = Settings::thumbSizeDp,
+                value = Settings.thumbSizeDp::value,
             )
             val thumbResolution = Settings::thumbResolution.observed
             val summary2 = stringResource(id = R.string.settings_eh_thumb_resolution_summary, stringArrayResource(id = R.array.thumb_resolution_entries)[thumbResolution.value])
