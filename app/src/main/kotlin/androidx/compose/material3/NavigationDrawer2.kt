@@ -16,13 +16,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -37,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -52,6 +48,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import com.hippo.ehviewer.ui.tools.animateFloatMergeOneWayPredictiveBackAsState
 import kotlin.math.roundToInt
@@ -303,7 +300,9 @@ fun ModalNavigationDrawer(
         Modifier
     }
     Box(modifier.fillMaxSize().then(dragModifier)) {
-        Box {
+        val step = calculateFraction(minValue, maxValue, drawerState.currentOffset)
+        val radius = lerp(0.dp, 10.dp, step)
+        Box(modifier = Modifier.blur(radius)) {
             content()
         }
         Scrim(
@@ -424,7 +423,9 @@ fun SideDrawer(
         Modifier
     }
     Box(modifier.fillMaxSize().then(dragModifier)) {
-        Box {
+        val step = calculateFraction(minValue, maxValue, drawerState.currentOffset)
+        val radius = lerp(0.dp, 10.dp, step)
+        Box(modifier = Modifier.blur(radius)) {
             content()
         }
         Scrim(
@@ -472,11 +473,10 @@ fun SideDrawer(
                 }
             }
         }
-        val insets = WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.End)
         Box(
             modifier = Modifier.offset {
                 IntOffset(drawerState.requireOffset().roundToInt(), 0)
-            }.windowInsetsPadding(insets).align(Alignment.CenterEnd) then predictiveModifier,
+            }.align(Alignment.CenterEnd) then predictiveModifier,
             contentAlignment = Alignment.CenterStart,
         ) {
             drawerContent()

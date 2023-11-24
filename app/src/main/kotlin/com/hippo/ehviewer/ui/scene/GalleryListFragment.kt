@@ -3,6 +3,7 @@ package com.hippo.ehviewer.ui.scene
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewConfiguration
@@ -10,9 +11,7 @@ import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.DraggableItem
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.dragContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,11 +33,12 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.foundation.rememberDragDropState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text2.input.rememberTextFieldState
 import androidx.compose.foundation.text2.input.setTextAndPlaceCursorAtEnd
@@ -46,8 +47,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.LastPage
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Reorder
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DismissDirection
@@ -55,13 +58,13 @@ import androidx.compose.material3.DismissValue
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LeadingIconTab
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.ShapeDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -70,10 +73,10 @@ import androidx.compose.material3.rememberDismissState
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -94,6 +97,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -141,6 +146,7 @@ import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_WHATS_HOT
 import com.hippo.ehviewer.client.exception.CloudflareBypassException
 import com.hippo.ehviewer.client.parser.GalleryDetailUrlParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
+import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.dao.QuickSearch
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.big.SadAndroid
@@ -160,7 +166,7 @@ import com.hippo.ehviewer.ui.main.NormalSearch
 import com.hippo.ehviewer.ui.main.SearchAdvanced
 import com.hippo.ehviewer.ui.scene.GalleryListFragment.Companion.toStartArgs
 import com.hippo.ehviewer.ui.tools.Deferred
-import com.hippo.ehviewer.ui.tools.FastScrollLazyColumn
+import com.hippo.ehviewer.ui.tools.FastScrollLazyVerticalGrid
 import com.hippo.ehviewer.ui.tools.FastScrollLazyVerticalStaggeredGrid
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
@@ -171,12 +177,14 @@ import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.findActivity
 import com.hippo.ehviewer.util.getParcelableCompat
+import com.hippo.ehviewer.util.isAtLeastOMR1
+import com.hippo.ehviewer.util.isAtLeastR
+import com.hippo.ehviewer.util.isAtLeastU
 import com.hippo.ehviewer.util.pickVisualMedia
 import com.ramcosta.composedestinations.annotation.Destination
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
-import eu.kanade.tachiyomi.util.system.pxToDp
 import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
@@ -188,6 +196,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.tarsin.coroutines.runSuspendCatching
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyColumnState
 
 @Destination
 @Composable
@@ -230,7 +240,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
     val dialogState = LocalDialogState.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     val gridState = rememberLazyStaggeredGridState()
     val isTopList = remember(urlBuilder) { urlBuilder.mode == MODE_TOPLIST }
     val ehHint = stringResource(R.string.gallery_list_search_bar_hint_e_hentai)
@@ -290,9 +300,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
             }
         }.flow.cachedIn(viewModelScope)
     }.collectAsLazyPagingItems()
-    val listMode by remember {
-        Settings.listModeBackField.valueFlow()
-    }.collectAsState(Settings.listMode)
+    val listMode by Settings.listMode.collectAsState()
 
     val quickSearchList = remember { mutableStateListOf<QuickSearch>() }
     val toplists = (stringArrayResource(id = R.array.toplist_entries) zip stringArrayResource(id = R.array.toplist_values)).toMap()
@@ -392,10 +400,11 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
 
                                     val quickSearch = urlBuilder.toQuickSearch(text)
                                     quickSearch.position = quickSearchList.size
-                                    quickSearchList.add(quickSearch)
-                                    launchIO {
+                                    // Insert to DB first to update the id
+                                    withIOContext {
                                         EhDB.insertQuickSearch(quickSearch)
                                     }
+                                    quickSearchList.add(quickSearch)
                                     saveProgress = checked
                                     return@awaitInputTextWithCheckBox null
                                 }
@@ -409,9 +418,12 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                     },
                     windowInsets = WindowInsets(0),
                 )
+                val view = LocalView.current
                 Box(modifier = Modifier.fillMaxSize()) {
                     val quickSearchListState = rememberLazyListState()
-                    val dragDropState = rememberDragDropState(quickSearchListState) { fromIndex, toIndex ->
+                    val reorderableLazyListState = rememberReorderableLazyColumnState(quickSearchListState) { from, to ->
+                        val fromIndex = from.index
+                        val toIndex = to.index
                         quickSearchList.apply {
                             add(toIndex, removeAt(fromIndex))
                         }
@@ -421,30 +433,40 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                             list.zip(range).forEach { it.first.position = it.second }
                             EhDB.updateQuickSearch(list)
                         }
+                        val feedbackConstant = if (isAtLeastU) {
+                            HapticFeedbackConstants.SEGMENT_FREQUENT_TICK
+                        } else if (isAtLeastOMR1) {
+                            HapticFeedbackConstants.TEXT_HANDLE_MOVE
+                        } else {
+                            HapticFeedbackConstants.CLOCK_TICK
+                        }
+                        view.performHapticFeedback(feedbackConstant)
                     }
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize().dragContainer(dragDropState),
+                        modifier = Modifier.fillMaxSize(),
                         state = quickSearchListState,
+                        contentPadding = WindowInsets.systemBars.only(WindowInsetsSides.Bottom).asPaddingValues(),
                     ) {
-                        itemsIndexed(quickSearchList) { index, item ->
-                            val dismissState = rememberDismissState(
-                                confirmValueChange = {
-                                    if (it == DismissValue.DismissedToStart) {
-                                        quickSearchList.removeAt(index)
-                                        coroutineScope.launchIO {
-                                            EhDB.deleteQuickSearch(item)
+                        items(quickSearchList, key = { it.id!! }) { item ->
+                            ReorderableItem(reorderableLazyListState, key = item.id!!) {
+                                val dismissState = rememberDismissState(
+                                    confirmValueChange = {
+                                        if (it == DismissValue.DismissedToStart) {
+                                            quickSearchList.remove(item)
+                                            coroutineScope.launchIO {
+                                                EhDB.deleteQuickSearch(item)
+                                            }
                                         }
-                                    }
-                                    true
-                                },
-                            )
-                            LocalTouchSlopProvider(Settings.touchSlopFactor.toFloat()) {
-                                SwipeToDismissBox(
-                                    state = dismissState,
-                                    backgroundContent = {},
-                                    directions = setOf(DismissDirection.EndToStart),
-                                ) {
-                                    DraggableItem(dragDropState = dragDropState, index = index) {
+                                        true
+                                    },
+                                )
+                                val viewConfiguration = LocalViewConfiguration.current
+                                LocalTouchSlopProvider(Settings.touchSlopFactor.toFloat()) {
+                                    SwipeToDismissBox(
+                                        state = dismissState,
+                                        backgroundContent = {},
+                                        directions = setOf(DismissDirection.EndToStart),
+                                    ) {
                                         Row(
                                             modifier = Modifier.clickable {
                                                 if (urlBuilder.mode == MODE_WHATS_HOT) {
@@ -454,17 +476,47 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                                                 }
                                                 showSearchLayout = false
                                                 coroutineScope.launch { sheetState.close() }
-                                            }.fillMaxWidth().minimumInteractiveComponentSize().padding(horizontal = 16.dp),
+                                            }.fillMaxWidth().padding(horizontal = 16.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(
                                                 text = item.name,
                                                 modifier = Modifier.weight(1f),
                                             )
-                                            Icon(
-                                                imageVector = Icons.Default.Reorder,
-                                                contentDescription = null,
-                                            )
+                                            CompositionLocalProvider(LocalViewConfiguration provides viewConfiguration) {
+                                                IconButton(
+                                                    onClick = {},
+                                                    modifier = Modifier.draggableHandle(
+                                                        onDragStarted = {
+                                                            val feedbackConstant = if (isAtLeastU) {
+                                                                HapticFeedbackConstants.DRAG_START
+                                                            } else if (isAtLeastR) {
+                                                                HapticFeedbackConstants.GESTURE_START
+                                                            } else if (isAtLeastOMR1) {
+                                                                HapticFeedbackConstants.KEYBOARD_PRESS
+                                                            } else {
+                                                                HapticFeedbackConstants.VIRTUAL_KEY
+                                                            }
+                                                            view.performHapticFeedback(feedbackConstant)
+                                                        },
+                                                        onDragStopped = {
+                                                            val feedbackConstant = if (isAtLeastR) {
+                                                                HapticFeedbackConstants.GESTURE_END
+                                                            } else if (isAtLeastOMR1) {
+                                                                HapticFeedbackConstants.KEYBOARD_RELEASE
+                                                            } else {
+                                                                HapticFeedbackConstants.VIRTUAL_KEY_RELEASE
+                                                            }
+                                                            view.performHapticFeedback(feedbackConstant)
+                                                        },
+                                                    ),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Reorder,
+                                                        contentDescription = null,
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -731,19 +783,23 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                     }
                 }
             }
-            SecondaryTabRow(
+            PrimaryTabRow(
                 selectedTabIndex = if (searchNormalMode) 0 else 1,
                 divider = {},
             ) {
-                Tab(
+                LeadingIconTab(
                     selected = searchNormalMode,
                     onClick = { searchNormalMode = true },
                     text = { Text(text = stringResource(id = R.string.keyword_search)) },
+                    icon = { Icon(imageVector = Icons.Default.Translate, contentDescription = null) },
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurface,
                 )
-                Tab(
+                LeadingIconTab(
                     selected = !searchNormalMode,
                     onClick = { searchNormalMode = false },
                     text = { Text(text = stringResource(id = R.string.search_image)) },
+                    icon = { Icon(imageVector = Icons.Default.ImageSearch, contentDescription = null) },
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -785,13 +841,16 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                 }
             }
             if (listMode == 0) {
-                val height = (3 * Settings.listThumbSize * 3).pxToDp.dp
+                val height by collectListThumbSizeAsState()
                 val showPages = Settings.showGalleryPages
-                FastScrollLazyColumn(
+                val columnWidth by collectDetailSizeAsState()
+                FastScrollLazyVerticalGrid(
+                    columns = GridCells.Adaptive(columnWidth),
                     modifier = combinedModifier,
                     state = listState,
                     contentPadding = realPadding,
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.gallery_list_interval)),
+                    horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.gallery_list_interval)),
                 ) {
                     items(
                         count = data.itemCount,
@@ -822,8 +881,9 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: NavController) {
                 }
             } else {
                 val gridInterval = dimensionResource(R.dimen.gallery_grid_interval)
+                val thumbWidth by Settings.thumbSizeDp.collectAsState()
                 FastScrollLazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Adaptive(Settings.thumbSizeDp.dp),
+                    columns = StaggeredGridCells.Adaptive(thumbWidth.dp),
                     modifier = combinedModifier,
                     state = gridState,
                     verticalItemSpacing = gridInterval,

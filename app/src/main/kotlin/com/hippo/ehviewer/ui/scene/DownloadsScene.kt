@@ -83,7 +83,6 @@ import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.Settings.detailSize
-import com.hippo.ehviewer.Settings.listThumbSize
 import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.coil.read
@@ -103,7 +102,6 @@ import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
 import com.hippo.ehviewer.ui.legacy.CheckBoxDialogBuilder
 import com.hippo.ehviewer.ui.legacy.EditTextDialogBuilder
 import com.hippo.ehviewer.ui.legacy.HandlerDrawable
-import com.hippo.ehviewer.ui.legacy.STRATEGY_MIN_SIZE
 import com.hippo.ehviewer.ui.legacy.ViewTransition
 import com.hippo.ehviewer.ui.main.DEFAULT_ASPECT
 import com.hippo.ehviewer.ui.main.requestOf
@@ -120,7 +118,6 @@ import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.launchUI
 import eu.kanade.tachiyomi.util.lang.withNonCancellableContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
-import eu.kanade.tachiyomi.util.system.pxToDp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -289,15 +286,13 @@ class DownloadsScene : SearchBarScene() {
             val layoutManager = AutoStaggeredGridLayoutManager(0, StaggeredGridLayoutManager.VERTICAL)
             layoutManager.setColumnSize(
                 resources.getDimensionPixelOffset(
-                    when (detailSize) {
+                    when (detailSize.value) {
                         0 -> R.dimen.gallery_list_column_width_long
                         1 -> R.dimen.gallery_list_column_width_short
-                        else -> throw IllegalStateException("Unexpected value: $detailSize")
+                        else -> throw IllegalStateException("Unexpected value: ${detailSize.value}")
                     },
                 ),
             )
-            layoutManager.setStrategy(STRATEGY_MIN_SIZE)
-            layoutManager.supportsPredictiveItemAnimations = false
             recyclerView.layoutManager = layoutManager
             val interval = resources.getDimensionPixelOffset(R.dimen.gallery_list_interval)
             val decoration = object : RecyclerView.ItemDecoration() {
@@ -722,6 +717,7 @@ class DownloadsScene : SearchBarScene() {
             binding.start.setOnClickListener(this)
             binding.stop.setOnClickListener(this)
             binding.thumb.setMD3Content {
+                val height by collectListThumbSizeAsState()
                 Spacer(modifier = Modifier.height(height).fillMaxWidth())
             }
             binding.handle.setOnTouchListener { _, event ->
@@ -768,11 +764,10 @@ class DownloadsScene : SearchBarScene() {
             }
         }
 
-        private val height = (3 * listThumbSize * 3).pxToDp.dp
-
         fun bind(info: DownloadInfo, isChecked: Boolean) {
             binding.root.isChecked = isChecked
             binding.thumb.setMD3Content {
+                val height by collectListThumbSizeAsState()
                 Card(onClick = ::onClick.partially1(binding.thumb)) {
                     CompanionAsyncThumb(
                         info = info,
