@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
@@ -29,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -50,12 +48,14 @@ import com.hippo.ehviewer.download.downloadDir
 import com.hippo.ehviewer.ktbuilder.imageRequest
 import com.hippo.ehviewer.ui.tools.CropDefaults
 import com.hippo.ehviewer.ui.tools.CrystalCard
+import com.hippo.ehviewer.ui.tools.DragHandle
 import com.hippo.ehviewer.ui.tools.GalleryListCardRating
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.sendTo
 import com.hippo.unifile.UniFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItemScope
 
 @Composable
 private fun AsyncThumb(
@@ -120,13 +120,12 @@ private fun AsyncThumb(
 }
 
 @Composable
-fun DownloadCard(
+fun ReorderableItemScope.DownloadCard(
     onClick: () -> Unit,
     onThumbClick: () -> Unit,
     onLongClick: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onDrag: () -> Unit,
     info: DownloadInfo,
     modifier: Modifier = Modifier,
 ) {
@@ -243,15 +242,7 @@ fun DownloadCard(
                         bottom.linkTo(parent.bottom)
                     },
                 ) {
-                    IconButton(onClick = { }) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = null,
-                            modifier = Modifier.pointerInput(info.gid) {
-                                awaitPointerEventScope { onDrag() }
-                            },
-                        )
-                    }
+                    DragHandle()
                     if (downloadState == DownloadInfo.STATE_WAIT || downloadState == DownloadInfo.STATE_DOWNLOAD) {
                         IconButton(onClick = onStop) {
                             Icon(imageVector = Icons.Default.Pause, contentDescription = null)

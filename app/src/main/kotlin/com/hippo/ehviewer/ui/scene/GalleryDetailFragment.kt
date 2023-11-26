@@ -1,18 +1,3 @@
-/*
- * Copyright 2016 Hippo Seven
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.hippo.ehviewer.ui.scene
 
 import android.Manifest
@@ -20,13 +5,10 @@ import android.app.Dialog
 import android.app.DownloadManager
 import android.content.DialogInterface
 import android.net.Uri
-import android.os.Bundle
 import android.os.Environment
 import android.os.Parcelable
 import android.text.TextUtils.TruncateAt.END
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
@@ -37,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,6 +49,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -92,10 +76,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.os.bundleOf
 import androidx.core.text.parseAsHtml
-import androidx.navigation.NavController
-import androidx.navigation.fragment.findNavController
 import arrow.core.partially1
 import coil.imageLoader
 import com.google.android.material.snackbar.Snackbar
@@ -140,6 +121,10 @@ import com.hippo.ehviewer.spider.SpiderQueen.Companion.MODE_READ
 import com.hippo.ehviewer.ui.GalleryInfoBottomSheet
 import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.confirmRemoveDownload
+import com.hippo.ehviewer.ui.destinations.GalleryCommentsScreenDestination
+import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
+import com.hippo.ehviewer.ui.destinations.GalleryListScreenDestination
+import com.hippo.ehviewer.ui.destinations.GalleryPreviewScreenDestination
 import com.hippo.ehviewer.ui.getFavoriteIcon
 import com.hippo.ehviewer.ui.jumpToReaderByPage
 import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
@@ -153,7 +138,6 @@ import com.hippo.ehviewer.ui.main.GalleryTags
 import com.hippo.ehviewer.ui.modifyFavorites
 import com.hippo.ehviewer.ui.navToReader
 import com.hippo.ehviewer.ui.openBrowser
-import com.hippo.ehviewer.ui.scene.GalleryListFragment.Companion.toStartArgs
 import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.CrystalCard
 import com.hippo.ehviewer.ui.tools.FilledTertiaryIconButton
@@ -167,10 +151,10 @@ import com.hippo.ehviewer.util.FavouriteStatusRouter
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.addTextToClipboard
 import com.hippo.ehviewer.util.findActivity
-import com.hippo.ehviewer.util.getParcelableCompat
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.requestPermission
 import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.launchUI
 import eu.kanade.tachiyomi.util.lang.withIOContext
@@ -230,7 +214,7 @@ private fun List<GalleryTagGroup>.getArtist(): String? {
 
 @Destination
 @Composable
-fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController) {
+fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNavigator) {
     var galleryInfo by rememberSaveable {
         val casted = args as? GalleryInfoArgs
         mutableStateOf<GalleryInfo?>(casted?.galleryInfo)
@@ -249,7 +233,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
         val gi = galleryInfo
         if (page != 0 && gi != null) {
             Snackbar.make(
-                activity.findViewById(R.id.fragment_container),
+                activity.findViewById(R.id.content),
                 context.getString(R.string.read_from, page),
                 Snackbar.LENGTH_LONG,
             ).setAction(R.string.read) { context.navToReader(gi.findBaseInfo(), page) }.show()
@@ -445,13 +429,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
 
     fun navigateToPreview(nextPage: Boolean = false) {
         (galleryInfo as? GalleryDetail)?.let {
-            navigator.navAnimated(
-                R.id.galleryPreviewsScene,
-                bundleOf(
-                    KEY_GALLERY_DETAIL to it,
-                    KEY_NEXT_PAGE to nextPage,
-                ),
-            )
+            navigator.navigate(GalleryPreviewScreenDestination(it, nextPage))
         }
     }
 
@@ -504,10 +482,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                 else -> stringResource(R.string.more_comment)
             }
             fun onNavigateToCommentScene() {
-                navigator.navAnimated(
-                    R.id.galleryCommentsScene,
-                    bundleOf(GalleryCommentsFragment.KEY_GALLERY_DETAIL to galleryDetail),
-                )
+                navigator.navigate(GalleryCommentsScreenDestination(galleryDetail))
             }
             CrystalCard {
                 commentsList.take(maxShowCount).forEach { item ->
@@ -548,10 +523,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                     it.title,
                     it.posted,
                 ) to {
-                    navigator.navAnimated(
-                        R.id.galleryDetailScene,
-                        bundleOf(GalleryDetailScene.KEY_ARGS to TokenArgs(it.gid, it.token!!)),
-                    )
+                    navigator.navigate(GalleryDetailScreenDestination(TokenArgs(it.gid, it.token!!)))
                 }
             }.toTypedArray()
             val navAction = dialogState.showSelectItem(*items)
@@ -625,31 +597,31 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                     val keyword = EhUtils.extractTitle(galleryDetail.title)
                     val artist = galleryDetail.tags.getArtist()
                     if (null != keyword) {
-                        navigator.navAnimated(
-                            R.id.galleryListScene,
-                            ListUrlBuilder(
-                                mode = ListUrlBuilder.MODE_NORMAL,
-                                mKeyword = "\"" + keyword + "\"",
-                            ).toStartArgs(),
-                            true,
+                        navigator.navigate(
+                            GalleryListScreenDestination(
+                                ListUrlBuilder(
+                                    mode = ListUrlBuilder.MODE_NORMAL,
+                                    mKeyword = "\"" + keyword + "\"",
+                                ),
+                            ),
                         )
                     } else if (artist != null) {
-                        navigator.navAnimated(
-                            R.id.galleryListScene,
-                            ListUrlBuilder(
-                                mode = ListUrlBuilder.MODE_TAG,
-                                mKeyword = "artist:$artist",
-                            ).toStartArgs(),
-                            true,
+                        navigator.navigate(
+                            GalleryListScreenDestination(
+                                ListUrlBuilder(
+                                    mode = ListUrlBuilder.MODE_TAG,
+                                    mKeyword = "artist:$artist",
+                                ),
+                            ),
                         )
                     } else if (null != galleryDetail.uploader) {
-                        navigator.navAnimated(
-                            R.id.galleryListScene,
-                            ListUrlBuilder(
-                                mode = ListUrlBuilder.MODE_UPLOADER,
-                                mKeyword = galleryDetail.uploader,
-                            ).toStartArgs(),
-                            true,
+                        navigator.navigate(
+                            GalleryListScreenDestination(
+                                ListUrlBuilder(
+                                    mode = ListUrlBuilder.MODE_UPLOADER,
+                                    mKeyword = galleryDetail.uploader,
+                                ),
+                            ),
                         )
                     }
                 },
@@ -659,12 +631,13 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                 text = stringResource(id = R.string.search_cover),
                 onClick = {
                     val key = galleryDetail.thumbKey.orEmpty()
-                    navigator.navAnimated(
-                        R.id.galleryListScene,
-                        ListUrlBuilder(
-                            mode = ListUrlBuilder.MODE_NORMAL,
-                            hash = key.substringAfterLast('/').substringBefore('-'),
-                        ).toStartArgs(),
+                    navigator.navigate(
+                        GalleryListScreenDestination(
+                            ListUrlBuilder(
+                                mode = ListUrlBuilder.MODE_NORMAL,
+                                hash = key.substringAfterLast('/').substringBefore('-'),
+                            ),
+                        ),
                     )
                 },
             )
@@ -866,7 +839,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                     val lub = ListUrlBuilder()
                     lub.mode = ListUrlBuilder.MODE_TAG
                     lub.keyword = it
-                    navigator.navAnimated(R.id.galleryListScene, lub.toStartArgs(), true)
+                    navigator.navigate(GalleryListScreenDestination(lub))
                 },
                 onTagLongClick = { translated, tag ->
                     val index = tag.indexOf(':')
@@ -958,7 +931,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                 return
             }
             val lub = ListUrlBuilder(category = category)
-            navigator.navAnimated(R.id.galleryListScene, lub.toStartArgs(), true)
+            navigator.navigate(GalleryListScreenDestination(lub))
         }
         fun onUploaderChipClick() {
             val uploader = galleryInfo.uploader
@@ -969,12 +942,24 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
             val lub = ListUrlBuilder()
             lub.mode = ListUrlBuilder.MODE_UPLOADER
             lub.keyword = uploader
-            navigator.navAnimated(R.id.galleryListScene, lub.toStartArgs(), true)
+            navigator.navigate(GalleryListScreenDestination(lub))
         }
+
+        var showBottomSheet by remember { mutableStateOf(false) }
+
+        if (showBottomSheet && galleryDetail != null) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                windowInsets = WindowInsets(0, 0, 0, 0),
+            ) {
+                GalleryInfoBottomSheet(galleryDetail, navigator)
+            }
+        }
+
         fun onGalleryInfoCardClick() {
-            galleryDetail ?: return
-            GalleryInfoBottomSheet(galleryDetail).show(activity.supportFragmentManager, "GalleryInfoBottomSheet")
+            showBottomSheet = true
         }
+
         fun showFilterUploaderDialog() {
             val uploader = galleryInfo.uploader
             val disowned = uploader == "(Disowned)"
@@ -1245,20 +1230,5 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: NavController)
                 }
             }
         }
-    }
-}
-
-class GalleryDetailScene : BaseScene() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val args = requireNotNull(arguments)
-        val composeArgs = requireNotNull(args.getParcelableCompat<GalleryDetailScreenArgs>(KEY_ARGS))
-        return ComposeWithMD3 {
-            val navigator = remember { findNavController() }
-            GalleryDetailScreen(composeArgs, navigator)
-        }
-    }
-
-    companion object {
-        const val KEY_ARGS = "args"
     }
 }
