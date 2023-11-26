@@ -1,9 +1,5 @@
 package com.hippo.ehviewer.ui.scene
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -49,10 +45,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.os.bundleOf
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
-import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -75,16 +68,20 @@ import com.hippo.ehviewer.client.data.FavListUrlBuilder
 import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.filled.GoTo
+import com.hippo.ehviewer.ui.LocalSideSheetState
 import com.hippo.ehviewer.ui.MainActivity
+import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
 import com.hippo.ehviewer.ui.main.FabLayout
 import com.hippo.ehviewer.ui.main.GalleryInfoGridItem
 import com.hippo.ehviewer.ui.main.GalleryInfoListItem
+import com.hippo.ehviewer.ui.main.GalleryList
 import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.rememberInVM
 import com.hippo.ehviewer.util.findActivity
 import com.hippo.ehviewer.util.mapToLongArray
 import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import java.time.Instant
 import java.time.LocalDateTime
@@ -99,7 +96,7 @@ import moe.tarsin.coroutines.runSuspendCatching
 
 @Destination
 @Composable
-fun FavouritesScreen(navigator: NavController) {
+fun FavouritesScreen(navigator: DestinationsNavigator) {
     // Meta State
     var urlBuilder by rememberSaveable { mutableStateOf(FavListUrlBuilder(favCat = Settings.recentFavCat)) }
     var searchBarOffsetY by remember { mutableStateOf(0) }
@@ -250,7 +247,8 @@ fun FavouritesScreen(navigator: NavController) {
         refreshState = refreshState,
         searchBarOffsetY = searchBarOffsetY,
         trailingIcon = {
-            IconButton(onClick = { activity.openSideSheet() }) {
+            val sheetState = LocalSideSheetState.current
+            IconButton(onClick = { coroutineScope.launch { sheetState.open() } }) {
                 Icon(imageVector = Icons.Outlined.FolderSpecial, contentDescription = null)
             }
         },
@@ -275,10 +273,7 @@ fun FavouritesScreen(navigator: NavController) {
                                     checkedInfoMap[info.gid] = info
                                 }
                             } else {
-                                navigator.navAnimated(
-                                    R.id.galleryDetailScene,
-                                    bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(info)),
-                                )
+                                navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
                             }
                         },
                         onLongClick = {
@@ -304,10 +299,7 @@ fun FavouritesScreen(navigator: NavController) {
                                     checkedInfoMap[info.gid] = info
                                 }
                             } else {
-                                navigator.navAnimated(
-                                    R.id.galleryDetailScene,
-                                    bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(info)),
-                                )
+                                navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
                             }
                         },
                         onLongClick = {
@@ -321,7 +313,6 @@ fun FavouritesScreen(navigator: NavController) {
             refreshState = refreshState,
             onRefresh = { refresh() },
             onLoading = { searchBarOffsetY = 0 },
-            navigator = navigator,
         )
     }
 
@@ -423,17 +414,6 @@ fun FavouritesScreen(navigator: NavController) {
                     data.refresh()
                 }
             }
-        }
-    }
-}
-
-class FavoritesFragment : BaseScene() {
-    override val enableDrawerGestures = true
-
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        return ComposeWithMD3 {
-            val navController = remember { findNavController() }
-            FavouritesScreen(navController)
         }
     }
 }

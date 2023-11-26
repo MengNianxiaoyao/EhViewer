@@ -1,24 +1,5 @@
-/*
- * Copyright 2016 Hippo Seven
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.hippo.ehviewer.ui.scene
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,14 +17,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,10 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.os.bundleOf
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
-import androidx.navigation.fragment.findNavController
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
@@ -64,25 +40,26 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
-import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.big.History
-import com.hippo.ehviewer.ui.MainActivity
+import com.hippo.ehviewer.ui.LocalNavDrawerState
+import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
 import com.hippo.ehviewer.ui.doGalleryInfoAction
 import com.hippo.ehviewer.ui.main.GalleryInfoListItem
 import com.hippo.ehviewer.ui.tools.Deferred
 import com.hippo.ehviewer.ui.tools.FastScrollLazyColumn
 import com.hippo.ehviewer.ui.tools.LocalDialogState
-import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
+import com.hippo.ehviewer.ui.tools.SwipeToDismissBox2
 import com.hippo.ehviewer.ui.tools.rememberInVM
-import com.hippo.ehviewer.util.findActivity
 import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.launchIO
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Destination
 @Composable
-fun HistoryScreen(navigator: NavController) {
+fun HistoryScreen(navigator: DestinationsNavigator) {
     val context = LocalContext.current
     val dialogState = LocalDialogState.current
     val coroutineScope = rememberCoroutineScope()
@@ -98,7 +75,8 @@ fun HistoryScreen(navigator: NavController) {
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.history)) },
                 navigationIcon = {
-                    IconButton(onClick = { context.findActivity<MainActivity>().openDrawer() }) {
+                    val drawerState = LocalNavDrawerState.current
+                    IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
                         Icon(imageVector = Icons.Default.Menu, contentDescription = null)
                     }
                 },
@@ -142,29 +120,24 @@ fun HistoryScreen(navigator: NavController) {
                             true
                         },
                     )
-                    LocalTouchSlopProvider(Settings.touchSlopFactor.toFloat()) {
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            backgroundContent = {},
-                            modifier = Modifier.animateItemPlacement(),
-                            directions = setOf(DismissDirection.EndToStart),
-                        ) {
-                            GalleryInfoListItem(
-                                onClick = {
-                                    navigator.navAnimated(
-                                        R.id.galleryDetailScene,
-                                        bundleOf(GalleryDetailScene.KEY_ARGS to GalleryInfoArgs(info)),
-                                    )
-                                },
-                                onLongClick = {
-                                    coroutineScope.launchIO {
-                                        dialogState.doGalleryInfoAction(info, context)
-                                    }
-                                },
-                                info = info,
-                                modifier = Modifier.height(cardHeight),
-                            )
-                        }
+                    SwipeToDismissBox2(
+                        state = dismissState,
+                        backgroundContent = {},
+                        modifier = Modifier.animateItemPlacement(),
+                        directions = setOf(DismissDirection.EndToStart),
+                    ) {
+                        GalleryInfoListItem(
+                            onClick = {
+                                navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
+                            },
+                            onLongClick = {
+                                coroutineScope.launchIO {
+                                    dialogState.doGalleryInfoAction(info, context)
+                                }
+                            },
+                            info = info,
+                            modifier = Modifier.height(cardHeight),
+                        )
                     }
                 } else {
                     Spacer(modifier = Modifier.height(cardHeight).fillMaxWidth())
@@ -189,17 +162,6 @@ fun HistoryScreen(navigator: NavController) {
                     )
                 }
             }
-        }
-    }
-}
-
-class HistoryFragment : BaseScene() {
-    override val enableDrawerGestures = true
-
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        return ComposeWithMD3 {
-            val navController = remember { findNavController() }
-            HistoryScreen(navController)
         }
     }
 }
