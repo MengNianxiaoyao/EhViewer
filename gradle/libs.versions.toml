@@ -90,10 +90,9 @@ compose-material3-windowsizeclass = { module = "androidx.compose.material3:mater
 compose-ui-util = { module = "androidx.compose.ui:ui-util" }
 compose-ui-viewbinding = { module = "androidx.compose.ui:ui-viewbinding" }
 
+cronet-embedded = "org.chromium.net:cronet-embedded:113.5672.61"
 compose-destinations-core = { module = "io.github.raamcosta.compose-destinations:core", version.ref = "compose-destinations" }
 compose-destinations-compiler = { module = "io.github.raamcosta.compose-destinations:ksp", version.ref = "compose-destinations" }
-
-cronet-embedded = "org.chromium.net:cronet-embedded:113.5672.61"
 
 desugar = "com.android.tools:desugar_jdk_libs_nio:2.0.4"
 
