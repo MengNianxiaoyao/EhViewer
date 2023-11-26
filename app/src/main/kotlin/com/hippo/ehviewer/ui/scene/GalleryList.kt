@@ -76,6 +76,7 @@ fun GalleryList(
     thumbItemContent: @Composable (LazyStaggeredGridItemScope.(BaseGalleryInfo) -> Unit) = {},
     refreshState: PullToRefreshState? = null,
     onRefresh: suspend CoroutineScope.() -> Unit = {},
+    onLoading: suspend CoroutineScope.() -> Unit = {},
     navigator: NavController? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -116,9 +117,9 @@ fun GalleryList(
             }
         } else {
             val gridInterval = dimensionResource(R.dimen.gallery_grid_interval)
-            val thumbWidth by Settings.thumbSizeDp.collectAsState()
+            val thumbColumns by Settings.thumbColumns.collectAsState()
             FastScrollLazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Adaptive(thumbWidth.dp),
+                columns = StaggeredGridCells.Fixed(thumbColumns),
                 modifier = combinedModifier,
                 state = thumbListState,
                 verticalItemSpacing = gridInterval,
@@ -149,6 +150,9 @@ fun GalleryList(
             var refreshing by remember { mutableStateOf(false) }
             when (val state = data.loadState.refresh) {
                 is LoadState.Loading -> if (!refreshState.isRefreshing) {
+                    LaunchedEffect(Unit) {
+                        onLoading()
+                    }
                     LaunchedEffect(Unit) {
                         if (listMode == 0) {
                             detailListState.scrollToItem(0)
