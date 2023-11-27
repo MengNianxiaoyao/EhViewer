@@ -2,7 +2,7 @@
 
 ## 下载
 
-请前往 [Releases](https://github.com/UjuiUjuMandan/EhViewer/releases) 下载与上游同步发布的 APK ， 或者去 [Actions](//github.com/UjuiUjuMandan/EhViewer/actions) 下载最新 CI 版本。
+请前往 [Releases](//github.com/UjuiUjuMandan/EhViewer/releases) 下载与上游同步发布的 APK ， 或者去 [Actions](//github.com/UjuiUjuMandan/EhViewer/actions/workflows/ci.yml) 下载最新 CI 版本。
 
 | 变种          | 功能                     |
 |-------------|------------------------|
