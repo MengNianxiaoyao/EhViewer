@@ -54,11 +54,6 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.google.android.material.datepicker.CalendarConstraints
-import com.google.android.material.datepicker.CompositeDateValidator
-import com.google.android.material.datepicker.DateValidatorPointBackward
-import com.google.android.material.datepicker.DateValidatorPointForward
-import com.google.android.material.datepicker.MaterialDatePicker
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
@@ -77,6 +72,7 @@ import com.hippo.ehviewer.ui.main.FabLayout
 import com.hippo.ehviewer.ui.main.GalleryInfoGridItem
 import com.hippo.ehviewer.ui.main.GalleryInfoListItem
 import com.hippo.ehviewer.ui.main.GalleryList
+import com.hippo.ehviewer.ui.showDatePicker
 import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.rememberInVM
@@ -85,12 +81,6 @@ import com.hippo.ehviewer.util.mapToLongArray
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.withIOContext
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -334,26 +324,9 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
     ) {
         if (!select) {
             onClick(EhIcons.Default.GoTo) {
-                val local = LocalDateTime.of(2007, 3, 21, 0, 0)
-                val fromDate = local.atZone(ZoneId.ofOffset("UTC", ZoneOffset.UTC)).toInstant().toEpochMilli()
-                val toDate = MaterialDatePicker.todayInUtcMilliseconds()
-                val listValidators = ArrayList<CalendarConstraints.DateValidator>()
-                listValidators.add(DateValidatorPointForward.from(fromDate))
-                listValidators.add(DateValidatorPointBackward.before(toDate))
-                val constraintsBuilder = CalendarConstraints.Builder()
-                    .setStart(fromDate)
-                    .setEnd(toDate)
-                    .setValidator(CompositeDateValidator.allOf(listValidators))
-                val datePicker = MaterialDatePicker.Builder.datePicker()
-                    .setCalendarConstraints(constraintsBuilder.build())
-                    .setTitleText(R.string.go_to)
-                    .setSelection(toDate)
-                    .build()
-                datePicker.show(activity.supportFragmentManager, "date-picker")
-                datePicker.addOnPositiveButtonClickListener { time: Long ->
-                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US).withZone(ZoneOffset.UTC)
-                    val jumpTo = formatter.format(Instant.ofEpochMilli(time))
-                    refresh(urlBuilder.copy(jumpTo = jumpTo))
+                coroutineScope.launch {
+                    val date = dialogState.showDatePicker()
+                    refresh(urlBuilder.copy(jumpTo = date))
                 }
             }
             onClick(Icons.Default.Refresh) {
@@ -369,11 +342,11 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                 throw CancellationException()
             }
             onClick(Icons.Default.Download) {
-                val info = checkedInfoMap.run { values.also { clear() } }
+                val info = checkedInfoMap.run { toMap().values.also { clear() } }
                 dialogState.startDownload(context, false, *info.toTypedArray())
             }
             onClick(Icons.Default.Delete) {
-                val info = checkedInfoMap.run { values.also { clear() } }
+                val info = checkedInfoMap.run { toMap().values.also { clear() } }
                 dialogState.awaitPermissionOrCancel(title = R.string.delete_favorites_dialog_title) {
                     Text(text = stringResource(R.string.delete_favorites_dialog_message, info.size))
                 }
@@ -396,7 +369,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                 val index = dialogState.showSelectItem(*array, title = R.string.move_favorites_dialog_title)
                 val srcCat = urlBuilder.favCat
                 val dstCat = if (index == 0) FavListUrlBuilder.FAV_CAT_LOCAL else index - 1
-                val info = checkedInfoMap.run { values.also { clear() } }
+                val info = checkedInfoMap.run { toMap().values.also { clear() } }
                 if (srcCat != dstCat) {
                     if (srcCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
                         // Move from local to cloud
