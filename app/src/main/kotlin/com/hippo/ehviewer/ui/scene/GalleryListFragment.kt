@@ -50,8 +50,6 @@ import androidx.compose.material3.LeadingIconTab
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -79,6 +77,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.dimensionResource
@@ -230,9 +229,9 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     val context = LocalContext.current
     val activity = remember { context.findActivity<MainActivity>() }
     val windowSizeClass = calculateWindowSizeClass(activity)
+    val density = LocalDensity.current
     val dialogState = LocalDialogState.current
     val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyGridState()
     val gridState = rememberLazyStaggeredGridState()
     val isTopList = remember(urlBuilder) { urlBuilder.mode == MODE_TOPLIST }
@@ -301,7 +300,6 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     val quickSearchName = getSuitableTitleForUrlBuilder(urlBuilder, false)
     var saveProgress by Settings::qSSaveProgress.observed
 
-    fun launchSnackbar(content: String) = coroutineScope.launch { snackbarHostState.showSnackbar(content) }
     fun getFirstVisibleItemIndex() = if (listMode == 0) {
         listState.firstVisibleItemIndex
     } else {
@@ -359,7 +357,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                             if (data.itemCount == 0) return@IconButton
 
                             if (urlBuilder.mode == MODE_IMAGE_SEARCH) {
-                                launchSnackbar(context.getString(R.string.image_search_not_quick_search))
+                                activity.showTip(R.string.image_search_not_quick_search, true)
                                 return@IconButton
                             }
 
@@ -369,7 +367,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                                 if (urlBuilder.equalsQuickSearch(q)) {
                                     val nextStr = q.name.substringAfterLast('@', "")
                                     if (nextStr.toLongOrNull() == next) {
-                                        launchSnackbar(context.getString(R.string.duplicate_quick_search, q.name))
+                                        activity.showTip(context.getString(R.string.duplicate_quick_search, q.name), true)
                                         return@IconButton
                                     }
                                 }
@@ -509,21 +507,6 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     }
 
     var hidden by remember { mutableStateOf(false) }
-    val searchBarConnection = remember {
-        val slop = ViewConfiguration.get(context).scaledTouchSlop
-        object : NestedScrollConnection {
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                val dy = -consumed.y
-                if (dy >= slop) {
-                    hidden = true
-                } else if (dy <= -slop / 2) {
-                    hidden = false
-                }
-                searchBarOffsetY = (searchBarOffsetY - dy).roundToInt().coerceIn(-300, 0)
-                return Offset.Zero // We never consume it
-            }
-        }
-    }
 
     val openGalleryKeyword = stringResource(R.string.gallery_list_search_bar_open_gallery)
     abstract class UrlSuggestion : Suggestion() {
@@ -585,10 +568,10 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                         val pageFrom = advancedSearchOption.fromPage
                         val pageTo = advancedSearchOption.toPage
                         if (pageTo != -1 && pageTo < 10) {
-                            activity.showTip(searchErr1, BaseScene.LENGTH_LONG)
+                            activity.showTip(searchErr1)
                             return@SearchBarScreen
                         } else if (pageFrom != -1 && pageTo != -1 && pageTo - pageFrom < 20) {
-                            activity.showTip(searchErr2, BaseScene.LENGTH_LONG)
+                            activity.showTip(searchErr2)
                             return@SearchBarScreen
                         }
                         builder.pageFrom = pageFrom
@@ -597,7 +580,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 } else {
                     builder.mode = MODE_IMAGE_SEARCH
                     if (imagePath.isBlank()) {
-                        activity.showTip(selectImageFirst, BaseScene.LENGTH_LONG)
+                        activity.showTip(selectImageFirst)
                         return@SearchBarScreen
                     }
                     val uri = Uri.parse(imagePath)
@@ -633,7 +616,6 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             }
         },
         searchBarOffsetY = searchBarOffsetY,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         trailingIcon = {
             val sheetState = LocalSideSheetState.current
             IconButton(onClick = { coroutineScope.launch { sheetState.open() } }) {
@@ -647,16 +629,16 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 )
             }
         },
-    ) { paddingValues ->
+    ) { contentPadding ->
         val layoutDirection = LocalLayoutDirection.current
         val marginH = dimensionResource(id = R.dimen.gallery_list_margin_h)
         val marginV = dimensionResource(id = R.dimen.gallery_list_margin_v)
         Column(
             modifier = Modifier.imePadding().verticalScroll(rememberScrollState())
                 .padding(
-                    top = paddingValues.calculateTopPadding() + marginV,
-                    start = paddingValues.calculateStartPadding(layoutDirection) + marginH,
-                    end = paddingValues.calculateEndPadding(layoutDirection) + marginH,
+                    top = contentPadding.calculateTopPadding() + marginV,
+                    start = contentPadding.calculateStartPadding(layoutDirection) + marginH,
+                    end = contentPadding.calculateEndPadding(layoutDirection) + marginH,
                     bottom = 8.dp,
                 )
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
@@ -755,11 +737,27 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
 
         val height by collectListThumbSizeAsState()
         val showPages = Settings.showGalleryPages
+        val searchBarConnection = remember {
+            val slop = ViewConfiguration.get(context).scaledTouchSlop
+            val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
+            object : NestedScrollConnection {
+                override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                    val dy = -consumed.y
+                    if (dy >= slop) {
+                        hidden = true
+                    } else if (dy <= -slop / 2) {
+                        hidden = false
+                    }
+                    searchBarOffsetY = (searchBarOffsetY - dy).roundToInt().coerceIn(-topPaddingPx, 0)
+                    return Offset.Zero // We never consume it
+                }
+            }
+        }
         GalleryList(
             modifier = Modifier.scale(animatedSearchLayout).alpha(animatedSearchLayout),
             data = data,
             contentModifier = Modifier.nestedScroll(searchBarConnection),
-            contentPadding = paddingValues,
+            contentPadding = contentPadding,
             listMode = listMode,
             detailListState = listState,
             detailItemContent = { info ->
