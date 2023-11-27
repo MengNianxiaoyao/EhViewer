@@ -271,6 +271,7 @@ dependencies {
     implementation(libs.bundles.kotlinx.serialization)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.jsoup)
 
     debugImplementation(libs.chucker)
