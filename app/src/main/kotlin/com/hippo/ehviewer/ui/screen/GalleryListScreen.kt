@@ -1,4 +1,4 @@
-package com.hippo.ehviewer.ui.scene
+package com.hippo.ehviewer.ui.screen
 
 import android.graphics.Bitmap
 import android.net.Uri
@@ -69,15 +69,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.dimensionResource
@@ -96,12 +95,6 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.google.android.material.datepicker.CalendarConstraints
-import com.google.android.material.datepicker.CalendarConstraints.DateValidator
-import com.google.android.material.datepicker.CompositeDateValidator
-import com.google.android.material.datepicker.DateValidatorPointBackward
-import com.google.android.material.datepicker.DateValidatorPointForward
-import com.google.android.material.datepicker.MaterialDatePicker
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
@@ -140,6 +133,7 @@ import com.hippo.ehviewer.ui.main.GalleryList
 import com.hippo.ehviewer.ui.main.ImageSearch
 import com.hippo.ehviewer.ui.main.NormalSearch
 import com.hippo.ehviewer.ui.main.SearchAdvanced
+import com.hippo.ehviewer.ui.showDatePicker
 import com.hippo.ehviewer.ui.tools.Deferred
 import com.hippo.ehviewer.ui.tools.DragHandle
 import com.hippo.ehviewer.ui.tools.LocalDialogState
@@ -158,12 +152,6 @@ import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import java.io.File
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -219,6 +207,13 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             if (keyword.isNotBlank()) {
                 searchFieldState.setTextAndPlaceCursorAtEnd(keyword)
             }
+        }
+    }
+
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(showSearchLayout) {
+        if (!showSearchLayout) {
+            focusManager.clearFocus()
         }
     }
 
@@ -625,7 +620,9 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.rotate(lerp(90f, 0f, animatedSearchLayout)),
+                    modifier = Modifier.graphicsLayer {
+                        rotationZ = lerp(90f, 0f, animatedSearchLayout)
+                    },
                 )
             }
         },
@@ -642,7 +639,11 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                     bottom = 8.dp,
                 )
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
-                .scale(1 - animatedSearchLayout).alpha(1 - animatedSearchLayout),
+                .graphicsLayer {
+                    scaleX = 1 - animatedSearchLayout
+                    scaleY = 1 - animatedSearchLayout
+                    alpha = 1 - animatedSearchLayout
+                },
         ) {
             AnimatedVisibility(visible = searchNormalMode) {
                 ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = dimensionResource(id = R.dimen.search_layout_margin_v))) {
@@ -754,7 +755,11 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             }
         }
         GalleryList(
-            modifier = Modifier.scale(animatedSearchLayout).alpha(animatedSearchLayout),
+            modifier = Modifier.graphicsLayer {
+                scaleX = animatedSearchLayout
+                scaleY = animatedSearchLayout
+                alpha = animatedSearchLayout
+            },
             data = data,
             contentModifier = Modifier.nestedScroll(searchBarConnection),
             contentPadding = contentPadding,
@@ -829,27 +834,9 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                     urlBuilder.setJumpTo(text)
                     data.refresh()
                 } else {
-                    val local = LocalDateTime.of(2007, 3, 21, 0, 0)
-                    val fromDate =
-                        local.atZone(ZoneId.ofOffset("UTC", ZoneOffset.UTC)).toInstant().toEpochMilli()
-                    val toDate = MaterialDatePicker.todayInUtcMilliseconds()
-                    val listValidators = ArrayList<DateValidator>()
-                    listValidators.add(DateValidatorPointForward.from(fromDate))
-                    listValidators.add(DateValidatorPointBackward.before(toDate))
-                    val constraintsBuilder = CalendarConstraints.Builder()
-                        .setStart(fromDate)
-                        .setEnd(toDate)
-                        .setValidator(CompositeDateValidator.allOf(listValidators))
-                    val datePicker = MaterialDatePicker.Builder.datePicker()
-                        .setCalendarConstraints(constraintsBuilder.build())
-                        .setTitleText(R.string.go_to)
-                        .setSelection(toDate)
-                        .build()
-                    datePicker.show(activity.supportFragmentManager, "date-picker")
-                    datePicker.addOnPositiveButtonClickListener { time ->
-                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US).withZone(ZoneOffset.UTC)
-                        val jumpTo = formatter.format(Instant.ofEpochMilli(time))
-                        urlBuilder.mJumpTo = jumpTo
+                    coroutineScope.launch {
+                        val date = dialogState.showDatePicker()
+                        urlBuilder.mJumpTo = date
                         data.refresh()
                     }
                 }

@@ -1,8 +1,7 @@
-package com.hippo.ehviewer.ui.scene
+package com.hippo.ehviewer.ui.screen
 
 import android.content.Intent
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -130,14 +129,14 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
     val hint = stringResource(R.string.search_bar_hint, title)
     val defaultName = stringResource(R.string.default_download_label_name)
     val allName = stringResource(R.string.download_all)
-    val list = remember(label) {
+    val list = remember(label, filterType, keyword) {
         when (label) {
             null -> DownloadManager.allInfoList
             defaultName -> DownloadManager.defaultInfoList
             else -> DownloadManager.getLabelDownloadInfoList(label) ?: DownloadManager.allInfoList.also { label = null }
         }.filter { info ->
             (filterType == -1 || info.state == filterType) && keyword?.let { info.title.containsIgnoreCase(it) || info.titleJpn.containsIgnoreCase(it) || info.uploader.containsIgnoreCase(it) } ?: true
-        }.map { it.copy(downloadInfo = it.downloadInfo.copy()) }
+        }
     }
     val labelsList = DownloadManager.labelList
 
@@ -330,7 +329,7 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                     onClick = {
                         expanded = false
                         coroutineScope.launch {
-                            filterType = dialogState.showSingleChoice(states, filterType)
+                            filterType = dialogState.showSingleChoice(states, filterType + 1) - 1
                         }
                     },
                 )
@@ -471,10 +470,11 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Image(
+                    Icon(
                         imageVector = EhIcons.Big.Default.Download,
                         contentDescription = null,
                         modifier = Modifier.padding(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = stringResource(id = R.string.no_download_info),
@@ -500,31 +500,29 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
             throw CancellationException()
         }
         onClick(Icons.Default.PlayArrow) {
-            val gidList = checkedInfoMap.run { values.also { clear() } }.mapToLongArray(DownloadInfo::gid)
+            val gidList = checkedInfoMap.run { toMap().values.also { clear() } }.mapToLongArray(DownloadInfo::gid)
             val intent = Intent(activity, DownloadService::class.java)
             intent.action = DownloadService.ACTION_START_RANGE
             intent.putExtra(DownloadService.KEY_GID_LIST, gidList)
             ContextCompat.startForegroundService(context, intent)
         }
         onClick(Icons.Default.Pause) {
-            val gidList = checkedInfoMap.run { values.also { clear() } }.mapToLongArray(DownloadInfo::gid)
+            val gidList = checkedInfoMap.run { toMap().values.also { clear() } }.mapToLongArray(DownloadInfo::gid)
             DownloadManager.stopRangeDownload(gidList)
         }
         onClick(Icons.Default.Delete) {
-            val infoList = checkedInfoMap.run { values.also { clear() } }
+            val infoList = checkedInfoMap.run { toMap().values.also { clear() } }
             dialogState.confirmRemoveDownloadRange(infoList)
         }
         onClick(Icons.AutoMirrored.Default.DriveFileMove) {
-            val infoList = checkedInfoMap.run { values.also { clear() } }
+            val infoList = checkedInfoMap.run { toMap().values.also { clear() } }
             dialogState.showMoveDownloadLabelList(infoList)
         }
     }
 }
 
-class DownloadsFragment {
-    companion object {
-        const val KEY_GID = "gid"
-        const val KEY_ACTION = "action"
-        const val ACTION_CLEAR_DOWNLOAD_SERVICE = "clear_download_service"
-    }
+object DownloadsFragment {
+    const val KEY_GID = "gid"
+    const val KEY_ACTION = "action"
+    const val ACTION_CLEAR_DOWNLOAD_SERVICE = "clear_download_service"
 }

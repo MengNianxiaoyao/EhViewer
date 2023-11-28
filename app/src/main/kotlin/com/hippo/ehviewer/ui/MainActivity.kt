@@ -113,10 +113,9 @@ import com.hippo.ehviewer.ui.destinations.SubscriptionScreenDestination
 import com.hippo.ehviewer.ui.destinations.ToplistScreenDestination
 import com.hippo.ehviewer.ui.destinations.WhatshotScreenDestination
 import com.hippo.ehviewer.ui.legacy.BaseDialogBuilder
-import com.hippo.ehviewer.ui.legacy.EditTextDialogBuilder
-import com.hippo.ehviewer.ui.scene.TokenArgs
-import com.hippo.ehviewer.ui.scene.navWithUrl
-import com.hippo.ehviewer.ui.scene.navigate
+import com.hippo.ehviewer.ui.screen.TokenArgs
+import com.hippo.ehviewer.ui.screen.navWithUrl
+import com.hippo.ehviewer.ui.screen.navigate
 import com.hippo.ehviewer.ui.settings.showNewVersion
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
@@ -218,18 +217,15 @@ class MainActivity : EhActivity() {
                 callback()
             }
 
+            val cannotParse = stringResource(R.string.error_cannot_parse_the_url)
             LaunchedEffect(Unit) {
                 intentFlow.collect {
                     when (intent?.action) {
                         Intent.ACTION_VIEW -> {
                             val url = intent.data?.toString()
                             if (url != null && !navController.navWithUrl(url)) {
-                                EditTextDialogBuilder(this@MainActivity, url, "")
-                                    .setTitle(R.string.error_cannot_parse_the_url)
-                                    .setPositiveButton(android.R.string.copy) { _, _ ->
-                                        this@MainActivity.addTextToClipboard(url)
-                                    }
-                                    .show()
+                                val new = dialogState.awaitInputText(initial = url, title = cannotParse)
+                                addTextToClipboard(new)
                             }
                         }
                         Intent.ACTION_SEND -> {
@@ -497,7 +493,7 @@ class MainActivity : EhActivity() {
     }
 
     fun showTip(message: CharSequence, useToast: Boolean = false) {
-        if (useToast || tipFlow.tryEmit(message.toString())) {
+        if (useToast || !tipFlow.tryEmit(message.toString())) {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
