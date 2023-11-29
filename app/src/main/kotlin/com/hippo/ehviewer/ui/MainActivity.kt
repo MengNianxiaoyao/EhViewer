@@ -40,11 +40,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.verticalScroll
@@ -117,6 +117,7 @@ import com.hippo.ehviewer.ui.screen.TokenArgs
 import com.hippo.ehviewer.ui.screen.navWithUrl
 import com.hippo.ehviewer.ui.screen.navigate
 import com.hippo.ehviewer.ui.settings.showNewVersion
+import com.hippo.ehviewer.ui.tools.IconFix
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
 import com.hippo.ehviewer.updater.AppUpdater
@@ -151,9 +152,9 @@ private val navItems = arrayOf(
 )
 
 class MainActivity : EhActivity() {
-    private val availableNetworks = mutableListOf<Network>()
+    private val sideSheet = mutableStateListOf<@Composable ColumnScope.(DrawerState2) -> Unit>()
 
-    private var sideSheet = mutableStateListOf<@Composable ColumnScope.(DrawerState2) -> Unit>()
+    private val availableNetworks = mutableListOf<Network>()
 
     @Composable
     fun ProvideSideSheetContent(content: @Composable ColumnScope.(DrawerState2) -> Unit) {
@@ -195,8 +196,8 @@ class MainActivity : EhActivity() {
         intentFlow.tryEmit(intent)
     }
 
-    private var tipFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    private var intentFlow = MutableSharedFlow<Intent>(extraBufferCapacity = 4)
+    private val tipFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val intentFlow = MutableSharedFlow<Intent>(extraBufferCapacity = 4)
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -331,11 +332,12 @@ class MainActivity : EhActivity() {
                             drawerContent = {
                                 ModalDrawerSheet(
                                     modifier = Modifier.widthIn(max = (configuration.screenWidthDp - 56).dp),
-                                    windowInsets = WindowInsets(0, 0, 0, 0),
+                                    windowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Start),
                                 ) {
                                     val scrollState = rememberScrollState()
                                     Column(
-                                        modifier = Modifier.verticalScroll(scrollState).navigationBarsPadding(),
+                                        modifier = Modifier.verticalScroll(scrollState)
+                                            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom)),
                                     ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.sadpanda_low_poly),
@@ -355,7 +357,7 @@ class MainActivity : EhActivity() {
                                                 },
                                                 modifier = Modifier.padding(horizontal = 12.dp),
                                                 icon = {
-                                                    Icon(imageVector = icon, contentDescription = null)
+                                                    IconFix(imageVector = icon, contentDescription = null)
                                                 },
                                             )
                                         }
