@@ -211,7 +211,6 @@ dependencies {
 
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.coordinatorlayout)
-    implementation(libs.androidx.fragment)
     // https://developer.android.com/jetpack/androidx/releases/lifecycle
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.compose)
@@ -223,13 +222,12 @@ dependencies {
     // https://developer.android.com/jetpack/androidx/releases/paging
     implementation(libs.bundles.androidx.paging)
 
-    implementation(libs.bundles.androidx.recyclerview)
+    implementation(libs.androidx.recyclerview)
 
     // https://developer.android.com/jetpack/androidx/releases/room
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.paging)
 
-    implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.work.runtime)
     implementation(libs.photoview) // Dead Dependency
     implementation(libs.directionalviewpager) // Dead Dependency
