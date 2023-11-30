@@ -32,25 +32,24 @@ import androidx.compose.material.icons.filled.NewLabel
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.DismissDirection
-import androidx.compose.material3.DismissValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDismissState
+import androidx.compose.material3.rememberSwipeToDismissState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -114,12 +113,9 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
     var filterType by rememberSaveable { mutableStateOf(-1) }
     var searchBarOffsetY by remember { mutableStateOf(0) }
     val searchFieldState = rememberTextFieldState()
-    var selectMode by remember { mutableStateOf(false) }
-    LockDrawer(selectMode)
     val checkedInfoMap = remember { mutableStateMapOf<Long, DownloadInfo>() }
-    SideEffect {
-        if (checkedInfoMap.isEmpty()) selectMode = false
-    }
+    val selectMode by rememberUpdatedState(checkedInfoMap.isNotEmpty())
+    LockDrawer(selectMode)
 
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity<MainActivity>() }
@@ -239,9 +235,9 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                     )
                 }
                 items(labelsList, key = { it.label }) { (item) ->
-                    val dismissState = rememberDismissState(
+                    val dismissState = rememberSwipeToDismissState(
                         confirmValueChange = {
-                            if (it == DismissValue.DismissedToStart) {
+                            if (it == SwipeToDismissValue.EndToStart) {
                                 coroutineScope.launch {
                                     DownloadManager.deleteLabel(item)
                                     label = ""
@@ -254,7 +250,6 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                         SwipeToDismissBox2(
                             state = dismissState,
                             backgroundContent = {},
-                            directions = setOf(DismissDirection.EndToStart),
                         ) {
                             val elevation by animateDpAsState(
                                 if (isDragging) {
@@ -313,7 +308,7 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
         searchFieldHint = hint,
         showSearchFab = selectMode,
         onApplySearch = { keyword = it.takeUnless { it.isBlank() } },
-        onSearchExpanded = { selectMode = false },
+        onSearchExpanded = { checkedInfoMap.clear() },
         onSearchHidden = {},
         searchBarOffsetY = { searchBarOffsetY },
         trailingIcon = {
@@ -446,7 +441,6 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                             },
                             onLongClick = {
                                 checkedInfoMap[info.gid] = info
-                                selectMode = true
                             },
                             onStart = {
                                 val intent = Intent(activity, DownloadService::class.java)
@@ -492,11 +486,9 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
     FabLayout(
         hidden = !selectMode,
         expanded = selectMode,
-        onExpandChanged = {
-            checkedInfoMap.clear()
-            selectMode = false
-        },
+        onExpandChanged = { checkedInfoMap.clear() },
         autoCancel = false,
+        showAddButton = false,
     ) {
         onClick(Icons.Default.DoneAll) {
             val info = list.associateBy { it.gid }
