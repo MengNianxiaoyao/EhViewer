@@ -133,7 +133,6 @@ class DialogState {
         title: String? = null,
         hint: String? = null,
         isNumber: Boolean = false,
-        @StringRes confirmText: Int = android.R.string.ok,
         invalidator: (suspend (String) -> String?)? = null,
     ): String {
         return dialog { cont ->
@@ -153,7 +152,7 @@ class DialogState {
                             }
                         }
                     }) {
-                        Text(text = stringResource(id = confirmText))
+                        Text(text = stringResource(id = android.R.string.ok))
                     }
                 },
                 title = title.ifNotNullThen { Text(text = title!!) },
