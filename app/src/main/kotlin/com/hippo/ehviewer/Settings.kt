@@ -168,7 +168,7 @@ object Settings : DataStorePreferences(null) {
     var avatar by stringOrNullPref("avatar", null)
     var bypassVpn by boolPref("bypass_vpn", true)
     var enableQuic by boolPref("enable_quic", true)
-    var dohUrl by stringPref("doh_url", "https://1.1.1.1/dns-query")
+    var dohUrl by stringPref("doh_url", "https://77.88.8.8/dns-query")
     var language by stringPref("app_language", "system").observed { updateWhenLocaleChanges() }
     var lastDawnDay by longPref("last_dawn_day", 0)
     var lastUpdateDay by longPref("last_update_day", 0)
