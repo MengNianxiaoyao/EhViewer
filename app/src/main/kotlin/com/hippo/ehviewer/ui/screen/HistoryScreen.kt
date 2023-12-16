@@ -14,11 +14,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SwipeToDismissValue
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +49,7 @@ import com.hippo.ehviewer.ui.tools.FastScrollLazyColumn
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.SwipeToDismissBox2
 import com.hippo.ehviewer.ui.tools.rememberInVM
+import com.hippo.ehviewer.util.FavouriteStatusRouter
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.launchIO
@@ -67,6 +68,7 @@ fun HistoryScreen(navigator: DestinationsNavigator) {
             EhDB.historyLazyList
         }.flow.cachedIn(viewModelScope)
     }.collectAsLazyPagingItems()
+    FavouriteStatusRouter.observe(historyData)
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -109,9 +111,9 @@ fun HistoryScreen(navigator: DestinationsNavigator) {
             ) { index ->
                 val info = historyData[index]
                 if (info != null) {
-                    val dismissState = rememberSwipeToDismissState(
+                    val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
-                            if (it == SwipeToDismissValue.EndToStart) {
+                            if (it == SwipeToDismissBoxValue.EndToStart) {
                                 coroutineScope.launchIO {
                                     EhDB.deleteHistoryInfo(info)
                                 }

@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -107,9 +109,16 @@ class DialogState {
         content = { block(realContinuation) }
     }
 
-    suspend fun <R> awaitResult(initial: R, @StringRes title: Int? = null, block: @Composable DialogScope<R>.() -> Unit): R {
+    suspend fun <R> awaitResult(
+        initial: R,
+        @StringRes title: Int? = null,
+        invalidator: (suspend (R) -> String?)? = null,
+        block: @Composable DialogScope<R>.(String?) -> Unit,
+    ): R {
         return dialog { cont ->
+            val coroutineScope = rememberCoroutineScope()
             val state = remember(cont) { mutableStateOf(initial) }
+            var error by remember(cont) { mutableStateOf<String?>(null) }
             val impl = remember(cont) {
                 object : DialogScope<R> {
                     override var expectedValue by state
@@ -118,12 +127,21 @@ class DialogState {
             AlertDialog(
                 onDismissRequest = { cont.cancel() },
                 confirmButton = {
-                    TextButton(onClick = { cont.resume(state.value) }) {
+                    TextButton(onClick = {
+                        if (invalidator == null) {
+                            cont.resume(state.value)
+                        } else {
+                            coroutineScope.launch {
+                                error = invalidator.invoke(state.value)
+                                error ?: cont.resume(state.value)
+                            }
+                        }
+                    }) {
                         Text(text = stringResource(id = android.R.string.ok))
                     }
                 },
                 title = title.ifNotNullThen { Text(text = stringResource(id = title!!)) },
-                text = { block(impl) },
+                text = { block(impl, error) },
             )
         }
     }
@@ -388,10 +406,10 @@ class DialogState {
     }
 
     suspend fun showSingleChoice(
-        items: Array<String>,
+        vararg items: String,
         selected: Int,
     ): Int = showNoButton {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
             items.forEachIndexed { index, text ->
                 Row(
                     modifier = Modifier.clickable { dismissWith(index) }.fillMaxWidth()

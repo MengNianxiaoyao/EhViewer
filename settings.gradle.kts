@@ -12,11 +12,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://jcenter.bintray.com")
+        maven("https://oss.sonatype.org/content/repositories/snapshots")
         maven("https://jitpack.io")
         maven("https://androidx.dev/storage/compose-compiler/repository/")
-        // Test if IME not hiding after performing search is fixed before updating.
-        maven("https://androidx.dev/snapshots/builds/11157558/artifacts/repository")
+        maven("https://androidx.dev/snapshots/builds/11212115/artifacts/repository")
     }
 }
 

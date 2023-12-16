@@ -8,7 +8,9 @@ import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
 import android.provider.Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +19,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -27,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +54,7 @@ import com.hippo.ehviewer.ui.tools.rememberedAccessor
 import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.Crash
 import com.hippo.ehviewer.util.ReadableTime
+import com.hippo.ehviewer.util.isCronetAvailable
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import java.io.File
@@ -143,6 +150,106 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                 entryValueRes = R.array.app_language_entry_values,
                 value = Settings::language,
             )
+            var enableCronet by Settings::enableQuic.observed
+            var enableDf by Settings::dF.observed
+            Preference(
+                title = stringResource(id = R.string.settings_advanced_http_engine),
+                summary = if (enableCronet) "Cronet" else "OkHttp",
+            ) {
+                coroutineScope.launch {
+                    dialogState.awaitPermissionOrCancel(
+                        title = R.string.settings_advanced_http_engine,
+                        showCancelButton = false,
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.align(Alignment.Center)) {
+                                SegmentedButton(
+                                    selected = !enableCronet,
+                                    onClick = {
+                                        enableCronet = false
+                                        enableDf = true
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                ) {
+                                    Text("OkHttp")
+                                }
+                                SegmentedButton(
+                                    selected = enableCronet,
+                                    onClick = {
+                                        enableCronet = true
+                                        enableDf = false
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                    enabled = isCronetAvailable,
+                                ) {
+                                    Text("Cronet")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            val ifCloudflareIPOverride = Settings::cloudflareIpOverride.observed
+            AnimatedVisibility(visible = enableCronet) {
+                SwitchPreference(
+                    title = stringResource(id = R.string.settings_advanced_cloudflare_ip_override),
+                    summary = stringResource(id = R.string.settings_advanced_cloudflare_ip_override_summary),
+                    value = ifCloudflareIPOverride.rememberedAccessor,
+                )
+            }
+            AnimatedVisibility(visible = ifCloudflareIPOverride.value && enableCronet) {
+                Preference(
+                    title = cloudflareIPtitle,
+                    summary = Settings.cloudflareIp,
+                ) {
+                    coroutineScope.launch {
+                        val newCloudflareIP = dialogState.awaitInputText(
+                            initial = Settings.cloudflareIp.toString(),
+                            title = cloudflareIPtitle,
+                            hint = cloudflareIPhint,
+                        )
+                        if (newCloudflareIP.isNotEmpty()) {
+                            Settings.cloudflareIp = newCloudflareIP
+                        }
+                    }
+                }
+            }
+            AnimatedVisibility(visible = enableDf) {
+                SwitchPreference(
+                    title = stringResource(id = R.string.settings_advanced_bypass_vpn_title),
+                    summary = stringResource(id = R.string.settings_advanced_bypass_vpn_summary),
+                    value = Settings::bypassVpn,
+                )
+            }
+            AnimatedVisibility(visible = enableDf) {
+                SwitchPreference(
+                    title = stringResource(id = R.string.settings_advanced_built_in_hosts_title),
+                    value = Settings::builtInHosts,
+                )
+            }
+            AnimatedVisibility(visible = enableDf) {
+                Preference(title = stringResource(id = R.string.settings_advanced_dns_over_http_title)) {
+                    val builder = EditTextDialogBuilder(
+                        context,
+                        Settings.dohUrl,
+                        context.getString(R.string.settings_advanced_dns_over_http_hint),
+                    )
+                    builder.setTitle(R.string.settings_advanced_dns_over_http_title)
+                    builder.setPositiveButton(android.R.string.ok, null)
+                    val dialog = builder.create().apply { show() }
+                    dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                        val text = builder.text.trim()
+                        runCatching {
+                            doh = if (text.isNotBlank()) buildDoHDNS(text) else null
+                        }.onFailure {
+                            builder.setError("Invalid URL!")
+                        }.onSuccess {
+                            Settings.dohUrl = text
+                            dialog.dismiss()
+                        }
+                    }
+                }
+            }
             SwitchPreference(
                 title = stringResource(id = R.string.preload_thumb_aggressively),
                 value = Settings::preloadThumbAggressively,
@@ -263,87 +370,6 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                             Uri.parse("package:$packageName"),
                         )
                         startActivity(intent)
-                    }
-                }
-            }
-            val isEnableQuic = Settings::enableQuic.observed
-            val isEnabledF = Settings::dF.observed
-            val ifCloudflareIPOverride = Settings::cloudflareIpOverride.observed
-            if (isEnabledF.value) {
-                isEnableQuic.value = false
-            }
-            if (isEnableQuic.value) {
-                isEnabledF.value = false
-            }
-            SwitchPreference(
-                title = stringResource(id = R.string.settings_advanced_enable_quic),
-                summary = stringResource(id = R.string.settings_advanced_enable_quic_summary),
-                value = isEnableQuic.rememberedAccessor,
-                enabled = !isEnabledF.value,
-            )
-            AnimatedVisibility(visible = isEnableQuic.value) {
-                SwitchPreference(
-                    title = stringResource(id = R.string.settings_advanced_cloudflare_ip_override),
-                    summary = stringResource(id = R.string.settings_advanced_cloudflare_ip_override_summary),
-                    value = ifCloudflareIPOverride.rememberedAccessor,
-                )
-            }
-            AnimatedVisibility(visible = ifCloudflareIPOverride.value && isEnableQuic.value) {
-                Preference(
-                    title = cloudflareIPtitle,
-                    summary = Settings.cloudflareIp,
-                ) {
-                    coroutineScope.launch {
-                        val newCloudflareIP = dialogState.awaitInputText(
-                            initial = Settings.cloudflareIp.toString(),
-                            title = cloudflareIPtitle,
-                            hint = cloudflareIPhint,
-                        )
-                        if (newCloudflareIP.isNotEmpty()) {
-                            Settings.cloudflareIp = newCloudflareIP
-                        }
-                    }
-                }
-            }
-            SwitchPreference(
-                title = stringResource(id = R.string.settings_advanced_domain_fronting_title),
-                summary = stringResource(id = R.string.settings_advanced_domain_fronting_summary),
-                value = isEnabledF.rememberedAccessor,
-                enabled = !isEnableQuic.value,
-            )
-            AnimatedVisibility(visible = isEnabledF.value) {
-                SwitchPreference(
-                    title = stringResource(id = R.string.settings_advanced_bypass_vpn_title),
-                    summary = stringResource(id = R.string.settings_advanced_bypass_vpn_summary),
-                    value = Settings::bypassVpn,
-                )
-            }
-            AnimatedVisibility(visible = isEnabledF.value) {
-                SwitchPreference(
-                    title = stringResource(id = R.string.settings_advanced_built_in_hosts_title),
-                    value = Settings::builtInHosts,
-                )
-            }
-            AnimatedVisibility(visible = isEnabledF.value) {
-                Preference(title = stringResource(id = R.string.settings_advanced_dns_over_http_title)) {
-                    val builder = EditTextDialogBuilder(
-                        context,
-                        Settings.dohUrl,
-                        context.getString(R.string.settings_advanced_dns_over_http_hint),
-                    )
-                    builder.setTitle(R.string.settings_advanced_dns_over_http_title)
-                    builder.setPositiveButton(android.R.string.ok, null)
-                    val dialog = builder.create().apply { show() }
-                    dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                        val text = builder.text.trim()
-                        runCatching {
-                            doh = if (text.isNotBlank()) buildDoHDNS(text) else null
-                        }.onFailure {
-                            builder.setError("Invalid URL!")
-                        }.onSuccess {
-                            Settings.dohUrl = text
-                            dialog.dismiss()
-                        }
                     }
                 }
             }

@@ -21,6 +21,43 @@ import kotlin.math.roundToInt
 private val colorYellow800 = Color(0xfff9a825)
 
 @Composable
+fun MetaRatingWidgetReuse(rating: Float, ratingSize: Dp, ratingInterval: Dp, modifier: Modifier = Modifier) {
+    val r = (rating * 2).roundToInt().coerceIn(0, 10)
+    val fullStar = r / 2
+    val halfStar = r % 2
+    val outlineStar = 5 - fullStar - halfStar
+    Row(modifier = modifier) {
+        repeat(fullStar) {
+            IconCached(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(ratingSize),
+                tint = colorYellow800,
+            )
+            Spacer(modifier = Modifier.width(ratingInterval))
+        }
+        repeat(halfStar) {
+            IconCached(
+                imageVector = Icons.AutoMirrored.Default.StarHalf,
+                contentDescription = null,
+                modifier = Modifier.size(ratingSize),
+                tint = colorYellow800,
+            )
+            Spacer(modifier = Modifier.width(ratingInterval))
+        }
+        repeat(outlineStar) {
+            IconCached(
+                imageVector = Icons.Default.StarOutline,
+                contentDescription = null,
+                modifier = Modifier.size(ratingSize),
+                tint = colorYellow800,
+            )
+            Spacer(modifier = Modifier.width(ratingInterval))
+        }
+    }
+}
+
+@Composable
 fun MetaRatingWidget(rating: Float, ratingSize: Dp, ratingInterval: Dp, modifier: Modifier = Modifier) {
     val r = (rating * 2).roundToInt().coerceIn(0, 10)
     val fullStar = r / 2
@@ -59,7 +96,7 @@ fun MetaRatingWidget(rating: Float, ratingSize: Dp, ratingInterval: Dp, modifier
 
 @Composable
 fun GalleryListCardRating(rating: Float, modifier: Modifier = Modifier) {
-    MetaRatingWidget(
+    MetaRatingWidgetReuse(
         rating = rating,
         ratingSize = dimensionResource(id = R.dimen.rating_size),
         ratingInterval = dimensionResource(id = R.dimen.rating_interval),

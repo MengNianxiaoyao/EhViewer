@@ -9,12 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.request.ImageRequest
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.ktbuilder.imageRequest
-import com.hippo.ehviewer.ui.tools.CropDefaults
+import com.hippo.ehviewer.ui.tools.shouldCrop
 
 @Composable
 @ReadOnlyComposable
@@ -46,10 +46,8 @@ fun EhAsyncCropThumb(
         modifier = modifier,
         onState = {
             if (it is AsyncImagePainter.State.Success) {
-                it.result.drawable.run {
-                    if (CropDefaults.shouldCrop(intrinsicWidth, intrinsicHeight)) {
-                        contentScale = ContentScale.Crop
-                    }
+                if (it.result.image.shouldCrop) {
+                    contentScale = ContentScale.Crop
                 }
             }
         },

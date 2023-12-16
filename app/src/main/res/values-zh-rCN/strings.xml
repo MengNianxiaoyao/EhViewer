@@ -86,8 +86,8 @@
     <string name="search_specify_tag">指定标签</string>
     <string name="search_enable_advance">启用高级选项</string>
     <string name="search_tip">一般搜索：就是搜索。\n\n订阅搜素：在订阅中搜索。\n\n指定上传者：列出该上传者上传的画廊。其他选项会被忽略。\n\n指定标签：列出含有该标签的画廊。其他选项会被忽略。</string>
-    <string name="search_sh">仅被删除的画廊</string>
-    <string name="search_sto">仅有种子的画廊</string>
+    <string name="search_sh">已删除</string>
+    <string name="search_sto">有种子</string>
     <string name="search_sr">最低评分：</string>
     <string name="search_sp">页数：</string>
     <string name="search_sp_to">到</string>
@@ -118,7 +118,7 @@
     <string name="delete_quick_search">删除快速搜索“%s”？</string>
     <string name="go_to_hint">第 %1$d 页，共 %2$d 页</string>
     <!-- search_min_rating -->
-    <string name="unlimited">不限</string>
+    <string name="any">不限</string>
     <string name="star_2">2 星</string>
     <string name="star_3">3 星</string>
     <string name="star_4">4 星</string>
@@ -379,6 +379,7 @@
     <string name="settings_advanced_app_language_title">App 界面语言</string>
     <string name="settings_advanced_enable_quic">QUIC 支持</string>
     <string name="settings_advanced_enable_quic_summary">启用 QUIC 协议支持（需要重启应用）</string>
+    <string name="settings_advanced_http_engine">Http 引擎（重启生效)</string>
     <string name="settings_advanced_touch_slop">[实验性] 触摸溢出系数</string>
     <string name="settings_advanced_touch_slop_summary">增大此项将降低滑动手势敏感度</string>
     <string name="settings_advanced_export_data">导出数据</string>

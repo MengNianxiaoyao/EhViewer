@@ -2,45 +2,39 @@
 
 package com.hippo.ehviewer.coil
 
-import android.net.Uri
 import android.webkit.MimeTypeMap
-import coil.ComponentRegistry
-import coil.ImageLoader
-import coil.decode.DataSource
-import coil.decode.ImageSource
-import coil.fetch.FetchResult
-import coil.fetch.Fetcher
-import coil.fetch.SourceResult
-import coil.request.Options
-import com.hippo.ehviewer.cronet.copyToChannel
-import com.hippo.ehviewer.cronet.cronetRequest
-import com.hippo.ehviewer.cronet.execute
-import com.hippo.ehviewer.cronet.noCache
-import java.io.RandomAccessFile
+import coil3.ComponentRegistry
+import coil3.ImageLoader
+import coil3.Uri
+import coil3.decode.DataSource
+import coil3.decode.ImageSource
+import coil3.fetch.FetchResult
+import coil3.fetch.Fetcher
+import coil3.fetch.SourceFetchResult
+import coil3.request.Options
+import com.hippo.ehviewer.client.ehRequest
+import com.hippo.ehviewer.util.copyTo
+import io.ktor.client.statement.bodyAsChannel
 
 /**
- * A HttpUriFetcher impl use Cronet for jvmheapless IO
+ * A HttpUriFetcher impl use Ktor (Will do jvmheapless IO when backing engine is Cronet)
  * cacheHeader is never respected | recorded since thumb is immutable
  */
-class CronetHttpUriFetcher(private val data: String, private val options: Options, private val imageLoader: ImageLoader) : Fetcher {
+class KtorHttpUriFetcher(private val data: String, private val options: Options, private val imageLoader: ImageLoader) : Fetcher {
     override suspend fun fetch(): FetchResult {
         val diskCacheKey = options.diskCacheKey ?: data
         val diskCache = requireNotNull(imageLoader.diskCache)
         val snapshot = diskCache.openSnapshot(diskCacheKey) ?: run {
-            val success = cronetRequest(data) {
-                noCache()
-            }.execute {
+            val success = ehRequest(data).execute {
                 diskCache.suspendEdit(diskCacheKey) {
-                    RandomAccessFile(data.toFile(), "rw").use {
-                        copyToChannel(it.channel)
-                    }
+                    it.bodyAsChannel().copyTo(data.toFile())
                 }
             }
             check(success)
             // diskcache snapshot MUST exist here
             requireNotNull(diskCache.openSnapshot(diskCacheKey))
         }
-        return SourceResult(
+        return SourceFetchResult(
             source = ImageSource(snapshot.data, diskCache.fileSystem, diskCacheKey, snapshot),
             mimeType = getMimeType(data),
             dataSource = DataSource.DISK,
@@ -48,9 +42,9 @@ class CronetHttpUriFetcher(private val data: String, private val options: Option
     }
 }
 
-fun ComponentRegistry.Builder.installCronetHttpUriFetcher() = add { data: Uri, options, loader ->
+fun ComponentRegistry.Builder.installKtorHttpUriFetcher() = add { data: Uri, options, loader ->
     if (data.scheme != "http" && data.scheme != "https") return@add null
-    CronetHttpUriFetcher(data.toString(), options, loader)
+    KtorHttpUriFetcher(data.toString(), options, loader)
 }
 
 private fun getMimeType(url: String) = MimeTypeMap.getSingleton().getMimeTypeFromUrl(url)
