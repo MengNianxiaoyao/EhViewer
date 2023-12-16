@@ -51,7 +51,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ModalBottomSheetFix
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -79,8 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.text.parseAsHtml
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import arrow.core.partially1
-import coil.imageLoader
-import com.google.android.material.snackbar.Snackbar
+import coil3.imageLoader
 import com.hippo.ehviewer.EhApplication.Companion.galleryDetailCache
 import com.hippo.ehviewer.EhApplication.Companion.imageCache
 import com.hippo.ehviewer.EhDB
@@ -120,6 +119,7 @@ import com.hippo.ehviewer.ktbuilder.imageRequest
 import com.hippo.ehviewer.spider.SpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.MODE_READ
 import com.hippo.ehviewer.ui.GalleryInfoBottomSheet
+import com.hippo.ehviewer.ui.LocalSnackbarHostState
 import com.hippo.ehviewer.ui.LockDrawer
 import com.hippo.ehviewer.ui.MainActivity
 import com.hippo.ehviewer.ui.confirmRemoveDownload
@@ -145,7 +145,6 @@ import com.hippo.ehviewer.ui.tools.CrystalCard
 import com.hippo.ehviewer.ui.tools.FilledTertiaryIconButton
 import com.hippo.ehviewer.ui.tools.FilledTertiaryIconToggleButton
 import com.hippo.ehviewer.ui.tools.GalleryDetailRating
-import com.hippo.ehviewer.ui.tools.IconFix
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.rememberLambda
 import com.hippo.ehviewer.util.AppHelper
@@ -170,7 +169,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.parcelize.Parcelize
 import moe.tarsin.coroutines.runSuspendCatching
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import splitties.systemservices.downloadManager
 import splitties.systemservices.layoutInflater
 
@@ -232,15 +230,23 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
     val galleryDetailUrl = remember { EhUrl.getGalleryDetailUrl(gid, token, 0, false) }
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity<MainActivity>() }
+    val snackbarState = LocalSnackbarHostState.current
+    var showReadAction by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(args, galleryInfo) {
-        val page = (args as? TokenArgs)?.page ?: 0
-        val gi = galleryInfo
-        if (page != 0 && gi != null) {
-            Snackbar.make(
-                activity.findViewById(R.id.content),
-                context.getString(R.string.read_from, page),
-                Snackbar.LENGTH_LONG,
-            ).setAction(R.string.read) { context.navToReader(gi.findBaseInfo(), page) }.show()
+        if (showReadAction) {
+            val page = (args as? TokenArgs)?.page ?: 0
+            val gi = galleryInfo
+            if (page != 0 && gi != null) {
+                showReadAction = false
+                val result = snackbarState.showSnackbar(
+                    context.getString(R.string.read_from, page),
+                    context.getString(R.string.read),
+                    true,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    context.navToReader(gi.findBaseInfo(), page)
+                }
+            }
         }
     }
     with(activity) {
@@ -587,7 +593,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
                         }
                     },
                 ) {
-                    IconFix(
+                    Icon(
                         imageVector = getFavoriteIcon(favSlot != NOT_FAVORITED),
                         contentDescription = null,
                     )
@@ -673,7 +679,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
                                                 FileUtils.sanitizeFilename("$name.torrent"),
                                             )
                                             r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                            r.addRequestHeader("Cookie", EhCookieStore.getCookieHeader(itemUrl.toHttpUrl()))
+                                            r.addRequestHeader("Cookie", EhCookieStore.getCookieHeader(itemUrl))
                                             try {
                                                 downloadManager.enqueue(r)
                                                 activity.showTip(R.string.download_torrent_started)
@@ -1211,23 +1217,21 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
             )
         },
     ) {
-        Surface {
-            val gi = galleryInfo
-            if (gi != null) {
-                GalleryDetailContent(
-                    galleryInfo = gi,
-                    contentPadding = it,
-                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                )
-            } else if (getDetailError.isNotBlank()) {
-                GalleryDetailErrorTip(error = getDetailError, onClick = { getDetailError = "" })
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+        val gi = galleryInfo
+        if (gi != null) {
+            GalleryDetailContent(
+                galleryInfo = gi,
+                contentPadding = it,
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            )
+        } else if (getDetailError.isNotBlank()) {
+            GalleryDetailErrorTip(error = getDetailError, onClick = { getDetailError = "" })
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
             }
         }
     }

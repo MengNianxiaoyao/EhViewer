@@ -1,8 +1,11 @@
 package com.hippo.ehviewer.ui.tools
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisallowComposableCalls
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.currentCompositeKeyHash
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.ViewModel
@@ -13,9 +16,9 @@ class StateMapViewModel : ViewModel() {
 }
 
 @Composable
-fun <T : Any> rememberInVM(
+inline fun <T : Any> rememberInVM(
     vararg inputs: Any?,
-    init: ViewModel.() -> T,
+    crossinline init: @DisallowComposableCalls ViewModel.() -> T,
 ): T {
     val vm: StateMapViewModel = viewModel()
     val key = currentCompositeKeyHash
@@ -32,3 +35,8 @@ fun <T : Any> rememberInVM(
     }
     return value
 }
+
+@Composable
+fun <T> rememberUpdatedStateInVM(newValue: T): State<T> = rememberInVM {
+    mutableStateOf(newValue)
+}.apply { value = newValue }

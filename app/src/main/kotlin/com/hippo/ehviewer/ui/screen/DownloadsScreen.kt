@@ -38,10 +38,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissValue
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -111,7 +111,7 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
     var label by Settings::recentDownloadLabel.observed
     var keyword by rememberSaveable { mutableStateOf<String?>(null) }
     var filterType by rememberSaveable { mutableStateOf(-1) }
-    var searchBarOffsetY by remember { mutableStateOf(0) }
+    var searchBarOffsetY by remember(label) { mutableStateOf(0) }
     val searchFieldState = rememberTextFieldState()
     val checkedInfoMap = remember { mutableStateMapOf<Long, DownloadInfo>() }
     val selectMode by rememberUpdatedState(checkedInfoMap.isNotEmpty())
@@ -235,9 +235,9 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                     )
                 }
                 items(labelsList, key = { it.label }) { (item) ->
-                    val dismissState = rememberSwipeToDismissState(
+                    val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
-                            if (it == SwipeToDismissValue.EndToStart) {
+                            if (it == SwipeToDismissBoxValue.EndToStart) {
                                 coroutineScope.launch {
                                     DownloadManager.deleteLabel(item)
                                     label = ""
@@ -327,7 +327,7 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                     onClick = {
                         expanded = false
                         coroutineScope.launch {
-                            filterType = dialogState.showSingleChoice(states, filterType + 1) - 1
+                            filterType = dialogState.showSingleChoice(*states, selected = filterType + 1) - 1
                         }
                     },
                 )
@@ -433,6 +433,9 @@ fun DownloadsScreen(navigator: DestinationsNavigator) {
                                         checkedInfoMap[info.gid] = info
                                     }
                                 } else {
+                                    coroutineScope.launchIO {
+                                        EhDB.putHistoryInfo(info.galleryInfo)
+                                    }
                                     context.navToReader(info.galleryInfo)
                                 }
                             },

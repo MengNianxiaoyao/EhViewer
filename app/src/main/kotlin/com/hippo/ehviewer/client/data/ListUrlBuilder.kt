@@ -17,8 +17,10 @@ package com.hippo.ehviewer.client.data
 
 import android.os.Parcelable
 import androidx.annotation.IntDef
+import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.EhUtils
+import com.hippo.ehviewer.client.addQueryParameter
 import com.hippo.ehviewer.client.addQueryParameterIfNotBlank
 import com.hippo.ehviewer.client.ehUrl
 import com.hippo.ehviewer.dao.QuickSearch
@@ -253,31 +255,23 @@ data class ListUrlBuilder(
 
     fun build(): String {
         return when (mode) {
-            MODE_NORMAL, MODE_SUBSCRIPTION -> ehUrl {
-                if (mode == MODE_SUBSCRIPTION) addPathSegment(EhUrl.WATCHED_PATH)
-                if (category != EhUtils.NONE) {
-                    addEncodedQueryParameter("f_cats", (category.inv() and EhUtils.ALL_CATEGORY).toString())
+            MODE_NORMAL, MODE_SUBSCRIPTION -> ehUrl(EhUrl.WATCHED_PATH.takeIf { mode == MODE_SUBSCRIPTION }) {
+                if (category > 0) {
+                    addQueryParameter("f_cats", (category.inv() and EhUtils.ALL_CATEGORY).toString())
                 }
+                val query = mKeyword?.let {
+                    val index = Settings.languageFilter.value
+                    GalleryInfo.S_LANG_TAGS.getOrNull(index)?.let { lang ->
+                        "$it $lang"
+                    } ?: it
+                }
+                addQueryParameterIfNotBlank("f_search", query)
                 addQueryParameterIfNotBlank("f_shash", hash)
                 addQueryParameterIfNotBlank("prev", mPrev)
                 addQueryParameterIfNotBlank("next", mNext)
                 addQueryParameterIfNotBlank("seek", mJumpTo)
-                // Search key
-                // the settings of ub:UrlBuilder may be overwritten by following Advance search
-                mKeyword?.split('|')?.forEachIndexed { idx, kwd ->
-                    val keyword = kwd.trim { it <= ' ' }
-                    when (idx) {
-                        0 -> addQueryParameterIfNotBlank("f_search", keyword)
-
-                        else -> keyword.indexOf(':').takeIf { it >= 0 }?.run {
-                            val key = keyword.substring(0, this).trim { it <= ' ' }
-                            val value = keyword.substring(this + 1).trim { it <= ' ' }
-                            addQueryParameterIfNotBlank(key, value)
-                        }
-                    }
-                }
                 // Advance search
-                if (advanceSearch != -1) {
+                if (advanceSearch > 0 || minRating > 0 || pageFrom > 0 || pageTo > 0) {
                     addQueryParameter("advsearch", "1")
                     if (advanceSearch and AdvanceTable.SH != 0) {
                         addQueryParameter("f_sh", "on")
@@ -295,20 +289,20 @@ data class ListUrlBuilder(
                         addQueryParameter("f_sft", "on")
                     }
                     // Set min star
-                    if (minRating != -1) {
+                    if (minRating > 0) {
                         addQueryParameter("f_sr", "on")
                         addQueryParameter("f_srdd", "$minRating")
                     }
                     // Pages
-                    if (pageFrom != -1 || pageTo != -1) {
+                    if (pageFrom > 0 || pageTo > 0) {
                         addQueryParameter("f_sp", "on")
                         addQueryParameterIfNotBlank(
                             "f_spf",
-                            pageFrom.takeUnless { it == -1 }?.toString(),
+                            pageFrom.takeIf { it > 0 }?.toString(),
                         )
                         addQueryParameterIfNotBlank(
                             "f_spt",
-                            pageTo.takeUnless { it == -1 }?.toString(),
+                            pageTo.takeIf { it > 0 }?.toString(),
                         )
                     }
                 }

@@ -65,7 +65,7 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 180047
-        versionName = "1.10.0.0"
+        versionName = "1.10.0"
         versionNameSuffix = "-SNAPSHOT"
         resourceConfigurations.addAll(
             listOf(
@@ -129,7 +129,7 @@ android {
             "-Xjvm-default=all",
             "-Xlambdas=indy",
 
-            "-opt-in=coil.annotation.ExperimentalCoilApi",
+            "-opt-in=coil3.annotation.ExperimentalCoilApi",
             "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi",
@@ -145,7 +145,6 @@ android {
             "-opt-in=splitties.preferences.DataStorePreferencesPreview",
 
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:experimentalStrongSkipping=true",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:intrinsicRemember=true",
         )
     }
 
@@ -210,7 +209,6 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
 
     implementation(libs.androidx.constraintlayout.compose)
-    implementation(libs.androidx.coordinatorlayout)
     // https://developer.android.com/jetpack/androidx/releases/lifecycle
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.compose)
@@ -220,7 +218,7 @@ dependencies {
     implementation(libs.bundles.androidx.navigation)
 
     // https://developer.android.com/jetpack/androidx/releases/paging
-    implementation(libs.bundles.androidx.paging)
+    implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.recyclerview)
 
@@ -231,8 +229,6 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.photoview) // Dead Dependency
     implementation(libs.directionalviewpager) // Dead Dependency
-    // https://github.com/google/accompanist/releases
-    implementation(libs.bundles.accompanist)
     implementation(libs.material)
 
     implementation(libs.bundles.splitties)
@@ -272,9 +268,6 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.jsoup)
 
-    debugImplementation(libs.chucker)
-    releaseImplementation(libs.chucker.nop)
-
     coreLibraryDesugaring(libs.desugar)
 
     "gmsImplementation"(libs.bundles.cronet)
@@ -282,9 +275,6 @@ dependencies {
 
 configurations.all {
     resolutionStrategy {
-        // Workaround IME won't show again once hidden.
-        // Google issue-tracker link?
-        force("androidx.compose.ui:ui-text-android:1.6.0-alpha08")
         exclude("androidx.navigation", "navigation-compose")
     }
 }

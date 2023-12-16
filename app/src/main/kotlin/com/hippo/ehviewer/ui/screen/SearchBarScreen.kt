@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,10 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text2.input.TextFieldState
@@ -44,10 +47,12 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,11 +61,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import androidx.core.view.SoftwareKeyboardControllerCompat
 import com.hippo.ehviewer.EhApplication.Companion.searchDatabase
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
@@ -109,28 +115,15 @@ fun SearchBarScreen(
     suggestionProvider: SuggestionProvider? = null,
     searchBarOffsetY: () -> Int,
     trailingIcon: @Composable () -> Unit,
+    filter: @Composable (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     var mSuggestionList by remember { mutableStateOf(emptyList<Suggestion>()) }
     val mSearchDatabase = searchDatabase.searchDao()
-    var active by remember { mutableStateOf(false) }
+    var active by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope { Dispatchers.IO }
     val context = LocalContext.current
     val dialogState = LocalDialogState.current
-
-    // Workaround for BTF2 cursor not showing
-    // We can't use an always focused WindowInfo because callbacks won't be called once
-    // the window regained focus after losing it (e.g. showing a dialog on top of it)
-    // https://issuetracker.google.com/issues/307323842
-    val windowInfo = LocalWindowInfo.current
-    remember {
-        val clazz = Class.forName("androidx.compose.ui.platform.WindowInfoImpl")
-        clazz.cast(windowInfo).let {
-            clazz.getDeclaredMethod("setWindowFocused", Boolean::class.javaPrimitiveType).apply {
-                invoke(it, true)
-            }
-        }
-    }
 
     class TagSuggestion(
         override val hint: String?,
@@ -239,6 +232,15 @@ fun SearchBarScreen(
     } else {
         Modifier
     }
+
+    // Workaround IME not hiding after performing search
+    // https://github.com/FooIbar/EhViewer/pull/412
+    val view = LocalView.current
+    val keyboardManager = remember { SoftwareKeyboardControllerCompat(view) }
+    SideEffect {
+        if (!active) keyboardManager.hide()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -271,7 +273,8 @@ fun SearchBarScreen(
             )
         }
         SearchBar(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter) then scrollAwayModifier,
+            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter) then scrollAwayModifier
+                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)),
             state = searchFieldState,
             onSearch = {
                 hideSearchView()
@@ -314,8 +317,13 @@ fun SearchBarScreen(
                 }
             },
         ) {
-            LazyColumn(contentPadding = WindowInsets.navigationBars.union(WindowInsets.ime).asPaddingValues()) {
-                items(mSuggestionList) {
+            filter?.invoke()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = WindowInsets.navigationBars.union(WindowInsets.ime)
+                    .only(WindowInsetsSides.Bottom).asPaddingValues(),
+            ) {
+                items(mSuggestionList, key = { it.keyword }) {
                     ListItem(
                         headlineContent = { Text(text = it.keyword) },
                         supportingContent = it.hint.ifNotNullThen { Text(text = it.hint!!) },
@@ -334,7 +342,7 @@ fun SearchBarScreen(
                             }
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable { it.onClick() },
+                        modifier = Modifier.clickable { it.onClick() }.animateItemPlacement(),
                     )
                 }
             }
