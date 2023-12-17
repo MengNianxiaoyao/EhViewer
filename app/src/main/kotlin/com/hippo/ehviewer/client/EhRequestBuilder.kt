@@ -18,6 +18,7 @@ package com.hippo.ehviewer.client
 import com.hippo.ehviewer.EhApplication.Companion.ktorClient
 import com.hippo.ehviewer.EhApplication.Companion.noRedirectKtorClient
 import com.hippo.ehviewer.Settings
+import eu.kanade.tachiyomi.util.system.logcat
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.FormBuilder
 import io.ktor.client.request.forms.FormDataContent
@@ -67,11 +68,12 @@ suspend inline fun ehRequest(
     url: String,
     referer: String? = null,
     origin: String? = null,
+    verbose: Boolean = true,
     builder: HttpRequestBuilder.() -> Unit = {},
 ) = ktorClient.prepareRequest(url) {
     applyEhConfig(referer, origin)
     apply(builder)
-}
+}.also { if (verbose) logcat("EhRequest") { url } }
 
 suspend inline fun noRedirectEhRequest(
     url: String,
@@ -81,7 +83,7 @@ suspend inline fun noRedirectEhRequest(
 ) = noRedirectKtorClient.prepareRequest(url) {
     applyEhConfig(referer, origin)
     apply(builder)
-}
+}.also { logcat("EhRequest") { url } }
 
 inline fun HttpRequestBuilder.formBody(builder: ParametersBuilder.() -> Unit) {
     method = HttpMethod.Post
