@@ -30,8 +30,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.ParcelFileDescriptor
-import android.os.ParcelFileDescriptor.MODE_READ_ONLY
 import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -48,7 +46,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheetFix
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -86,6 +84,7 @@ import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.FileUtils
+import com.hippo.ehviewer.util.awaitActivityResult
 import com.hippo.ehviewer.util.getParcelableCompat
 import com.hippo.ehviewer.util.getParcelableExtraCompat
 import com.hippo.ehviewer.util.getValue
@@ -96,7 +95,7 @@ import com.hippo.ehviewer.util.lazyMut
 import com.hippo.ehviewer.util.requestPermission
 import com.hippo.ehviewer.util.sendTo
 import com.hippo.ehviewer.util.setValue
-import com.hippo.unifile.UniFile
+import com.hippo.unifile.asUniFile
 import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.setting.OrientationType
@@ -107,10 +106,10 @@ import eu.kanade.tachiyomi.ui.reader.viewer.BaseViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.launchUI
+import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import eu.kanade.tachiyomi.util.system.isNightMode
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
@@ -120,6 +119,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import moe.tarsin.coroutines.runSuspendCatching
 import splitties.init.appCtx
 import splitties.systemservices.clipboardManager
 
@@ -139,7 +139,6 @@ class ReaderActivity : EhActivity() {
     private var mUri: Uri? = null
     private var mGalleryInfo: BaseGalleryInfo? = null
     private var mPage: Int = 0
-    private var mCacheFileName: String? = null
     private val vm: GalleryModel by viewModels()
     private val dialogState = DialogState()
 
@@ -147,36 +146,7 @@ class ReaderActivity : EhActivity() {
      * Whether the menu is currently visible.
      */
     var menuVisible by mutableStateOf(false)
-
-    private var saveImageToLauncher = registerForActivityResult(
-        CreateDocument("todo/todo"),
-    ) { uri ->
-        if (uri != null) {
-            val filepath = AppConfig.externalTempDir.toString() + File.separator + mCacheFileName
-            val cachefile = File(filepath)
-            lifecycleScope.launchIO {
-                try {
-                    ParcelFileDescriptor.open(cachefile, MODE_READ_ONLY).use { from ->
-                        contentResolver.openFileDescriptor(uri, "w")!!.use {
-                            from sendTo it
-                        }
-                    }
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                } finally {
-                    runOnUiThread {
-                        Toast.makeText(
-                            this@ReaderActivity,
-                            getString(R.string.image_saved, uri.path),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                }
-                cachefile.delete()
-            }
-        }
-    }
-    var mGalleryProvider by lazyMut { vm::galleryProvider }
+    private var mGalleryProvider by lazyMut { vm::galleryProvider }
     private var mCurrentIndex: Int = 0
 
     private val galleryDetailUrl: String?
@@ -368,7 +338,18 @@ class ReaderActivity : EhActivity() {
         initializeMenu()
     }
 
-    fun setGallery() {
+    fun retryPage(index: Int, orgImg: Boolean = false) {
+        mGalleryProvider?.retryPage(index, orgImg)
+    }
+
+    fun restartGalleryProvider() {
+        mGalleryProvider?.let {
+            it.restart()
+            viewer?.refreshAdapter()
+        }
+    }
+
+    private fun setGallery() {
         if (mGalleryProvider?.isReady != true) return
 
         // Get start page
@@ -408,7 +389,7 @@ class ReaderActivity : EhActivity() {
         }
         val file = mGalleryProvider!!.save(
             page,
-            UniFile.fromFile(dir)!!,
+            dir.asUniFile(),
             mGalleryProvider!!.getImageFilenameWithExtension(page),
         )
         if (file == null) {
@@ -466,7 +447,7 @@ class ReaderActivity : EhActivity() {
         }
         val file = mGalleryProvider!!.save(
             page,
-            UniFile.fromFile(dir)!!,
+            dir.asUniFile(),
             mGalleryProvider!!.getImageFilenameWithExtension(page),
         )
         if (file == null) {
@@ -534,7 +515,7 @@ class ReaderActivity : EhActivity() {
                     Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
                     return@launchUI
                 }
-                if (!mGalleryProvider!!.save(page, UniFile.fromMediaUri(this@ReaderActivity, imageUri))) {
+                if (!mGalleryProvider!!.save(page, imageUri.asUniFile())) {
                     try {
                         resolver.delete(imageUri, null, null)
                     } catch (e: Exception) {
@@ -571,7 +552,7 @@ class ReaderActivity : EhActivity() {
         }
         val file = mGalleryProvider!!.save(
             page,
-            UniFile.fromFile(dir)!!,
+            dir.asUniFile(),
             mGalleryProvider!!.getImageFilenameWithExtension(page),
         )
         if (file == null) {
@@ -583,12 +564,21 @@ class ReaderActivity : EhActivity() {
             Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
             return
         }
-        mCacheFileName = filename
-        try {
-            saveImageToLauncher.launch(filename)
-        } catch (e: Throwable) {
-            ExceptionUtils.throwIfFatal(e)
-            Toast.makeText(this, R.string.error_cant_find_activity, Toast.LENGTH_SHORT).show()
+        val activity = this
+        lifecycleScope.launchUI {
+            runSuspendCatching {
+                val uri = awaitActivityResult(CreateDocument("todo/todo"), filename)
+                if (uri != null) {
+                    withIOContext {
+                        val f = requireNotNull(AppConfig.externalTempDir).asUniFile() / filename
+                        f sendTo uri.asUniFile()
+                        f.delete()
+                    }
+                    Toast.makeText(activity, getString(R.string.image_saved, uri.path), Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure {
+                Toast.makeText(activity, R.string.error_cant_find_activity, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -757,7 +747,7 @@ class ReaderActivity : EhActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 fun dismiss() = it.cancel()
                 val sheetState = rememberModalBottomSheetState()
-                ModalBottomSheetFix(
+                ModalBottomSheet(
                     onDismissRequest = { dismiss() },
                     sheetState = sheetState,
                     windowInsets = WindowInsets(0),

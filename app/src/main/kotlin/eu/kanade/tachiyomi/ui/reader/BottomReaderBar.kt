@@ -31,7 +31,11 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.asMutableState
 import com.hippo.ehviewer.collectAsState
+import com.hippo.ehviewer.icons.EhIcons
+import com.hippo.ehviewer.icons.filled.Crop
+import com.hippo.ehviewer.icons.filled.CropOff
 import eu.kanade.tachiyomi.ui.reader.setting.OrientationType
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingModeType
 
@@ -106,6 +110,13 @@ fun BottomReaderBar(onClickSettings: () -> Unit) {
             Icon(
                 painter = painterResource(orientationMode.iconRes),
                 contentDescription = stringResource(R.string.pref_rotation_type),
+            )
+        }
+        var cropBorder by Settings.cropBorder.asMutableState()
+        IconButton(onClick = { cropBorder = !cropBorder }) {
+            Icon(
+                imageVector = if (cropBorder) EhIcons.Default.Crop else EhIcons.Default.CropOff,
+                contentDescription = stringResource(R.string.pref_crop_borders),
             )
         }
         IconButton(onClick = onClickSettings) {

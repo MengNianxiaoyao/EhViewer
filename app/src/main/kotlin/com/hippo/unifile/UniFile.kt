@@ -16,14 +16,16 @@
 package com.hippo.unifile
 
 import android.content.ContentResolver
-import android.content.Context
 import android.content.Intent
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
-import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import androidx.annotation.RequiresApi
+import androidx.core.net.toFile
+import androidx.core.provider.DocumentsContractCompat
 import java.io.File
+import splitties.init.appCtx
 
 /**
  * In Android files can be accessed via [java.io.File] and [android.net.Uri].
@@ -173,9 +175,11 @@ abstract class UniFile internal constructor(private val parent: UniFile?) {
     /**
      * Get child file of this directory, the child might not exist.
      *
-     * @return the child file, `null` if not supported
+     * @return the child file
      */
-    abstract fun subFile(displayName: String): UniFile?
+    abstract fun resolve(displayName: String): UniFile
+
+    operator fun div(name: String) = resolve(name)
 
     /**
      * Deletes this file.
@@ -196,31 +200,21 @@ abstract class UniFile internal constructor(private val parent: UniFile?) {
      */
     abstract fun exists(): Boolean
 
-    /**
-     * Returns an array of files contained in the directory represented by this
-     * file.
-     *
-     * @return an array of files or `null`.
-     * @see android.provider.DocumentsContract.buildChildDocumentsUriUsingTree
-     */
-    abstract fun listFiles(): Array<UniFile>?
+    abstract fun listFiles(): List<UniFile>
 
-    /**
-     * Gets a list of the files in the directory represented by this file. This
-     * list is then filtered through a FilenameFilter and the names of files
-     * with matching names are returned as an array of strings.
-     *
-     * @param filter the filter to match names against, may be `null`.
-     * @return an array of files or `null`.
-     */
-    abstract fun listFiles(filter: FilenameFilter?): Array<UniFile>?
+    abstract fun findFirst(filter: (String) -> Boolean): UniFile?
+
+    open fun openFileDescriptor(mode: String) = appCtx.contentResolver.openFileDescriptor(uri, mode) ?: error("Can't open ParcelFileDescriptor")
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    open fun asImageSource() = ImageDecoder.createSource(appCtx.contentResolver, uri)
 
     /**
      * Test there is a file with the display name in the directory.
      *
      * @return the file if found it, or `null`.
      */
-    abstract fun findFile(displayName: String): UniFile?
+    fun findFile(displayName: String) = resolve(displayName).takeIf { it.exists() }
 
     /**
      * Renames this file to `displayName`.
@@ -244,154 +238,29 @@ abstract class UniFile internal constructor(private val parent: UniFile?) {
      */
     abstract fun renameTo(displayName: String): Boolean
 
-    @get:RequiresApi(Build.VERSION_CODES.P)
-    abstract val imageSource: ImageDecoder.Source
-
-    abstract fun openFileDescriptor(mode: String): ParcelFileDescriptor
-
     companion object {
-        private var sUriHandlerArray: MutableList<UriHandler>? = null
+        fun fromFile(file: File) = RawFile(null, file)
 
-        /**
-         * Add a UriHandler to get UniFile from uri
-         */
-        fun addUriHandler(handler: UriHandler) {
-            if (sUriHandlerArray == null) {
-                sUriHandlerArray = ArrayList()
-            }
-            sUriHandlerArray!!.add(handler)
+        fun fromSingleUri(singleUri: Uri) = SingleDocumentFile(null, singleUri)
+
+        fun fromTreeUri(treeUri: Uri) = TreeDocumentFile(null, DocumentsContractApi21.prepareTreeUri(treeUri))
+
+        fun fromMediaUri(mediaUri: Uri) = MediaFile(mediaUri)
+
+        fun fromUri(uri: Uri) = when {
+            isFileUri(uri) -> fromFile(uri.toFile())
+            isTreeUri(uri) -> fromTreeUri(uri)
+            isDocumentUri(uri) -> fromSingleUri(uri)
+            isMediaUri(uri) -> fromMediaUri(uri)
+            else -> null
         }
 
-        /**
-         * Remove the UriHandler added before
-         */
-        fun removeUriHandler(handler: UriHandler) {
-            if (sUriHandlerArray != null) {
-                sUriHandlerArray!!.remove(handler)
-            }
-        }
+        fun isFileUri(uri: Uri) = ContentResolver.SCHEME_FILE == uri.scheme
 
-        /**
-         * Create a [UniFile] representing the given [File].
-         *
-         * @param file the file to wrap
-         * @return the [UniFile] representing the given [File].
-         */
-        fun fromFile(file: File?): UniFile? {
-            return if (file != null) RawFile(null, file) else null
-        }
+        fun isDocumentUri(uri: Uri) = DocumentsContract.isDocumentUri(appCtx, uri)
 
-        /**
-         * Create a [UniFile] representing the single document at the
-         * given [Uri]. This is only useful on devices running
-         * [android.os.Build.VERSION_CODES.KITKAT] or later, and will return
-         * `null` when called on earlier platform versions.
-         *
-         * @param singleUri the [Intent.getData] from a successful
-         * [Intent.ACTION_OPEN_DOCUMENT] or
-         * [Intent.ACTION_CREATE_DOCUMENT] request.
-         * @return the [UniFile] representing the given [Uri].
-         */
-        fun fromSingleUri(context: Context, singleUri: Uri): UniFile? {
-            val version = Build.VERSION.SDK_INT
-            return if (version >= 19) {
-                SingleDocumentFile(null, context, singleUri)
-            } else {
-                null
-            }
-        }
+        fun isTreeUri(uri: Uri) = DocumentsContractCompat.isTreeUri(uri)
 
-        /**
-         * Create a [UniFile] representing the document tree rooted at
-         * the given [Uri]. This is only useful on devices running
-         * [Build.VERSION_CODES.LOLLIPOP] or later, and will return
-         * `null` when called on earlier platform versions.
-         *
-         * @param treeUri the [Intent.getData] from a successful
-         * [Intent.ACTION_OPEN_DOCUMENT_TREE] request.
-         * @return the [UniFile] representing the given [Uri].
-         */
-        fun fromTreeUri(context: Context, treeUri: Uri): UniFile? {
-            val version = Build.VERSION.SDK_INT
-            return if (version >= 21) {
-                TreeDocumentFile(
-                    null,
-                    context,
-                    DocumentsContractApi21.prepareTreeUri(treeUri),
-                )
-            } else {
-                null
-            }
-        }
-
-        /**
-         * Create a [UniFile] representing the media file rooted at
-         * the given [Uri].
-         *
-         * @param mediaUri the media uri to wrap
-         * @return the [UniFile] representing the given [Uri].
-         */
-        fun fromMediaUri(context: Context, mediaUri: Uri): UniFile {
-            return MediaFile(context, mediaUri)
-        }
-
-        /**
-         * Create a [UniFile] representing the given [Uri].
-         */
-        fun fromUri(context: Context, uri: Uri): UniFile? {
-            // Custom handler
-            if (sUriHandlerArray != null) {
-                var i = 0
-                val size = sUriHandlerArray!!.size
-                while (i < size) {
-                    val file = sUriHandlerArray!![i].fromUri(context, uri)
-                    if (file != null) {
-                        return file
-                    }
-                    i++
-                }
-            }
-            return if (isFileUri(uri)) {
-                fromFile(File(uri.path!!))
-            } else if (isDocumentUri(context, uri)) {
-                if (isTreeUri(uri)) {
-                    fromTreeUri(context, uri)
-                } else {
-                    fromSingleUri(context, uri)
-                }
-            } else if (MediaFile.isMediaUri(context, uri)) {
-                MediaFile(context, uri)
-            } else {
-                null
-            }
-        }
-
-        /**
-         * Test if given Uri is FileUri
-         */
-        fun isFileUri(uri: Uri): Boolean {
-            return ContentResolver.SCHEME_FILE == uri.scheme
-        }
-
-        /**
-         * Test if given Uri is backed by a
-         * [android.provider.DocumentsProvider].
-         */
-        fun isDocumentUri(context: Context, uri: Uri): Boolean {
-            val version = Build.VERSION.SDK_INT
-            return if (version >= 19) {
-                DocumentsContractApi19.isDocumentUri(context, uri)
-            } else {
-                false
-            }
-        }
-
-        /**
-         * Test if given Uri is TreeUri
-         */
-        fun isTreeUri(uri: Uri): Boolean {
-            val paths = uri.pathSegments
-            return ContentResolver.SCHEME_CONTENT == uri.scheme && paths.size >= 2 && "tree" == paths[0]
-        }
+        fun isMediaUri(uri: Uri) = null != MediaContract.getName(uri)
     }
 }

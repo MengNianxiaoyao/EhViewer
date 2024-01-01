@@ -46,14 +46,14 @@ import com.hippo.ehviewer.util.assertNotMainThread
 import com.hippo.ehviewer.util.mapNotNull
 import com.hippo.ehviewer.util.runAssertingNotMainThread
 import com.hippo.unifile.UniFile
+import com.hippo.unifile.asUniFile
+import com.hippo.unifile.asUniFileOrNull
 import eu.kanade.tachiyomi.util.lang.launchIO
-import eu.kanade.tachiyomi.util.lang.withIOContext
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
-import splitties.init.appCtx
 import splitties.preferences.edit
 
 object DownloadManager : OnSpiderListener {
@@ -595,17 +595,6 @@ object DownloadManager : OnSpiderListener {
         map[label] = mutableStateListOf()
     }
 
-    suspend fun moveLabel(fromPosition: Int, toPosition: Int) {
-        val item = labelList.removeAt(fromPosition)
-        labelList.add(toPosition, item)
-        withIOContext {
-            val range = if (fromPosition < toPosition) fromPosition..toPosition else toPosition..fromPosition
-            val list = labelList.slice(range)
-            list.zip(range).forEach { it.first.position = it.second }
-            EhDB.updateDownloadLabel(list)
-        }
-    }
-
     suspend fun renameLabel(from: String, to: String) {
         val index = labelList.indexOfFirst { it.label == from }
         if (index != -1) {
@@ -1017,16 +1006,14 @@ object DownloadManager : OnSpiderListener {
 
 var downloadLocation: UniFile
     get() = with(Settings) {
-        UniFile.fromUri(
-            appCtx,
-            Uri.Builder().apply {
-                scheme(downloadScheme)
-                encodedAuthority(downloadAuthority)
-                encodedPath(downloadPath)
-                encodedQuery(downloadQuery)
-                encodedFragment(downloadFragment)
-            }.build(),
-        ) ?: UniFile.fromFile(AppConfig.defaultDownloadDir)!!
+        val uri = Uri.Builder().apply {
+            scheme(downloadScheme)
+            encodedAuthority(downloadAuthority)
+            encodedPath(downloadPath)
+            encodedQuery(downloadQuery)
+            encodedFragment(downloadFragment)
+        }.build()
+        uri.asUniFileOrNull() ?: requireNotNull(AppConfig.defaultDownloadDir).asUniFile()
     }
     set(value) = with(value.uri) {
         Settings.edit {
@@ -1038,4 +1025,4 @@ var downloadLocation: UniFile
         }
     }
 
-val DownloadInfo.downloadDir get() = dirname?.let { downloadLocation.subFile(it) }
+val DownloadInfo.downloadDir get() = dirname?.let { downloadLocation / it }

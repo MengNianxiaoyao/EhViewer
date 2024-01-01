@@ -49,7 +49,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.ModalBottomSheetFix
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -217,7 +217,7 @@ private fun List<GalleryTagGroup>.getArtist(): String? {
 @Composable
 fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNavigator) {
     LockDrawer(true)
-    var galleryInfo by rememberSaveable {
+    var galleryInfo by remember {
         val casted = args as? GalleryInfoArgs
         mutableStateOf<GalleryInfo?>(casted?.galleryInfo)
     }
@@ -493,7 +493,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
                 else -> stringResource(R.string.more_comment)
             }
             fun onNavigateToCommentScene() {
-                navigator.navigate(GalleryCommentsScreenDestination(galleryDetail))
+                navigator.navigate(GalleryCommentsScreenDestination(galleryDetail.gid))
             }
             CrystalCard {
                 commentsList.take(maxShowCount).forEach { item ->
@@ -955,7 +955,7 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
         var showBottomSheet by remember { mutableStateOf(false) }
 
         if (showBottomSheet && galleryDetail != null) {
-            ModalBottomSheetFix(
+            ModalBottomSheet(
                 onDismissRequest = { showBottomSheet = false },
                 windowInsets = WindowInsets(0, 0, 0, 0),
             ) {
@@ -1136,7 +1136,13 @@ fun GalleryDetailScreen(args: GalleryDetailScreenArgs, navigator: DestinationsNa
                             contentDescription = null,
                         )
                     }
-                    IconButton(onClick = { AppHelper.share(activity, galleryDetailUrl) }) {
+                    IconButton(
+                        onClick = {
+                            AppHelper.share(activity, galleryDetailUrl)
+                            // In case the link is copied to the clipboard
+                            Settings.clipboardTextHashCode = galleryDetailUrl.hashCode()
+                        },
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = null,

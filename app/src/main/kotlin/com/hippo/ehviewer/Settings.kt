@@ -111,10 +111,8 @@ object Settings : DataStorePreferences(null) {
     val listThumbSize = intPref("list_tile_size", 40)
     val languageFilter = intPref("language_filter", -1)
     val meteredNetworkWarning = boolPref("cellular_network_warning", false)
-    val predictiveNavAnim = boolPref("predictive_nav_anim", true)
     val blackDarkTheme = boolPref("black_dark_theme", false)
 
-    val needSignInFlow: Flow<Boolean>
     var downloadScheme by stringOrNullPref("image_scheme", null)
     var downloadAuthority by stringOrNullPref("image_authority", null)
     var downloadPath by stringOrNullPref("image_path", null)
@@ -149,7 +147,7 @@ object Settings : DataStorePreferences(null) {
     var security by boolPref("require_unlock", false)
     var builtInHosts by boolPref(KEY_BUILT_IN_HOSTS, true)
     var removeImageFiles by boolPref("include_pic", true)
-    var needSignIn by boolPref("need_sign_in", true).also { needSignInFlow = it.valueFlow() }
+    var needSignIn by boolPref("need_sign_in", true)
     var harmonizeCategoryColor by boolPref("harmonize_category_color", true)
     var preloadThumbAggressively by boolPref("preload_thumb_aggressively", false)
     var dF by boolPref(KEY_DOMAIN_FRONTING, false)
@@ -185,6 +183,7 @@ object Settings : DataStorePreferences(null) {
     var touchSlopFactor by intPref("touch_slop", 3)
 
     // Tachiyomi Reader
+    val cropBorder = boolPref("crop_borders", false)
     val colorFilter = boolPref("pref_color_filter_key", false)
     val colorFilterValue = intPref("color_filter_value", 0)
     val colorFilterMode = intPref("color_filter_mode", 0)

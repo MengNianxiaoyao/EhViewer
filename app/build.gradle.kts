@@ -64,8 +64,8 @@ android {
         applicationId = "moe.tarsin.ehviewer"
         minSdk = 28
         targetSdk = 34
-        versionCode = 180048
-        versionName = "1.10.1"
+        versionCode = 180049
+        versionName = "1.10.2"
         versionNameSuffix = "-SNAPSHOT"
         resourceConfigurations.addAll(
             listOf(
@@ -156,6 +156,7 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/**"
+            excludes += "/okhttp3/**"
             excludes += "/kotlin/**"
             excludes += "**.txt"
             excludes += "**.bin"
@@ -230,6 +231,7 @@ dependencies {
     implementation(libs.photoview) // Dead Dependency
     implementation(libs.directionalviewpager) // Dead Dependency
     implementation(libs.material)
+    implementation(libs.material.motion.core)
 
     implementation(libs.bundles.splitties)
 
