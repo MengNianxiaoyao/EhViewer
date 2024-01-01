@@ -31,6 +31,7 @@ import com.hippo.ehviewer.client.exception.NotLoggedInException
 import com.hippo.ehviewer.client.exception.ParseException
 import com.hippo.ehviewer.client.parser.ArchiveParser
 import com.hippo.ehviewer.client.parser.EventPaneParser
+import com.hippo.ehviewer.client.parser.FavParserResult
 import com.hippo.ehviewer.client.parser.FavoritesParser
 import com.hippo.ehviewer.client.parser.ForumsParser
 import com.hippo.ehviewer.client.parser.GalleryApiParser
@@ -254,13 +255,18 @@ object EhEngine {
                 append("edit_comment", id.toString())
             }
         }
-    }.fetchUsingAsText {
-        val document = Jsoup.parse(this)
-        val elements = document.select("#chd + p")
-        if (elements.size > 0) {
-            throw EhException(elements[0].text())
+    }.execute { response ->
+        // Ktor does not handle POST redirect, we need to do it manually
+        // https://youtrack.jetbrains.com/issue/KTOR-478
+        val location = response.headers["Location"] ?: url
+        ehRequest(location, url).fetchUsingAsText {
+            val document = Jsoup.parse(this)
+            val elements = document.select("#chd + p")
+            if (elements.size > 0) {
+                throw EhException(elements[0].text())
+            }
+            GalleryDetailParser.parseComments(document)
         }
-        GalleryDetailParser.parseComments(document)
     }
 
     suspend fun modifyFavorites(gid: Long, token: String?, dstCat: Int = -1, note: String = "") {
@@ -319,7 +325,7 @@ object EhEngine {
         }
     }.fetchUsingAsText(HomeParser::parseResetLimits)
 
-    suspend fun modifyFavorites(gidArray: LongArray, srcCat: Int, dstCat: Int): FavoritesParser.Result {
+    suspend fun modifyFavorites(gidArray: LongArray, srcCat: Int, dstCat: Int): FavParserResult {
         val url = ehUrl(EhUrl.FAV_PATH) {
             if (FavListUrlBuilder.isValidFavCat(srcCat)) addQueryParameter("favcat", srcCat.toString())
         }.buildString()

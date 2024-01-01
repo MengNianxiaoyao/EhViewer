@@ -15,47 +15,27 @@
  */
 package com.hippo.unifile
 
-import android.content.Context
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import java.io.IOException
 
-internal class MediaFile(context: Context, override val uri: Uri) : UniFile(null) {
-    private val mContext: Context
+class MediaFile(override val uri: Uri) : UniFile(null) {
+    override fun createFile(displayName: String) = null
 
-    init {
-        mContext = context.applicationContext
-    }
-
-    override fun createFile(displayName: String): UniFile? {
-        return null
-    }
-
-    override fun createDirectory(displayName: String): UniFile? {
-        return null
-    }
+    override fun createDirectory(displayName: String) = null
 
     override val name: String?
-        get() = MediaContract.getName(mContext, uri)
+        get() = MediaContract.getName(uri)
     override val type: String?
-        get() = MediaContract.getType(mContext, uri)
-    override val isDirectory: Boolean
-        get() = false
+        get() = MediaContract.getType(uri)
+    override val isDirectory = false
     override val isFile: Boolean
-        get() = DocumentsContractApi19.isFile(mContext, uri)
+        get() = DocumentsContractApi19.isFile(uri)
 
-    override fun lastModified(): Long {
-        return MediaContract.lastModified(mContext, uri)
-    }
+    override fun lastModified() = MediaContract.lastModified(uri)
 
-    override fun length(): Long {
-        return MediaContract.length(mContext, uri)
-    }
+    override fun length() = MediaContract.length(uri)
 
-    override fun canRead(): Boolean {
-        return isFile
-    }
+    override fun canRead() = isFile
 
     override fun canWrite(): Boolean {
         try {
@@ -67,52 +47,19 @@ internal class MediaFile(context: Context, override val uri: Uri) : UniFile(null
         return true
     }
 
-    override fun ensureDir(): Boolean {
-        return false
-    }
+    override fun ensureDir() = false
 
-    override fun ensureFile(): Boolean {
-        return isFile
-    }
+    override fun ensureFile() = isFile
 
-    override fun subFile(displayName: String): UniFile? {
-        return null
-    }
+    override fun resolve(displayName: String) = error("MediaFile never have a children")
 
-    override fun delete(): Boolean {
-        return false
-    }
+    override fun delete() = false
 
-    override fun exists(): Boolean {
-        return isFile
-    }
+    override fun exists() = isFile
 
-    override fun listFiles(): Array<UniFile>? {
-        return null
-    }
+    override fun listFiles() = emptyList<MediaFile>()
 
-    override fun listFiles(filter: FilenameFilter?): Array<UniFile>? {
-        return null
-    }
+    override fun findFirst(filter: (String) -> Boolean) = null
 
-    override fun findFile(displayName: String): UniFile? {
-        return null
-    }
-
-    override fun renameTo(displayName: String): Boolean {
-        return false
-    }
-
-    override val imageSource: ImageDecoder.Source
-        get() = Contracts.getImageSource(mContext, uri)
-
-    override fun openFileDescriptor(mode: String): ParcelFileDescriptor {
-        return Contracts.openFileDescriptor(mContext, uri, mode)
-    }
-
-    companion object {
-        fun isMediaUri(context: Context, uri: Uri): Boolean {
-            return null != MediaContract.getName(context, uri)
-        }
-    }
+    override fun renameTo(displayName: String) = false
 }

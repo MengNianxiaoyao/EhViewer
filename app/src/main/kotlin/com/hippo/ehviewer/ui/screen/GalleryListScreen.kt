@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -178,7 +179,7 @@ fun ToplistScreen(navigator: DestinationsNavigator) =
 fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     val searchFieldState = rememberTextFieldState()
     var urlBuilder by rememberSaveable(lub) { mutableStateOf(lub) }
-    var searchBarOffsetY by remember { mutableStateOf(0) }
+    var searchBarOffsetY by remember { mutableIntStateOf(0) }
     var showSearchLayout by rememberSaveable { mutableStateOf(false) }
 
     var category by rememberSaveable { mutableIntStateOf(Settings.searchCategory) }
@@ -223,7 +224,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     val isTopList = remember(urlBuilder) { urlBuilder.mode == MODE_TOPLIST }
     val ehHint = stringResource(R.string.gallery_list_search_bar_hint_e_hentai)
     val exHint = stringResource(R.string.gallery_list_search_bar_hint_exhentai)
-    val searchBarHint = remember { if (EhUtils.isExHentai) exHint else ehHint }
+    val searchBarHint by rememberUpdatedState(if (EhUtils.isExHentai) exHint else ehHint)
     val suitableTitle = getSuitableTitleForUrlBuilder(urlBuilder)
     val data = rememberInVM {
         Pager(PagingConfig(25)) {
@@ -406,17 +407,10 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                     val reorderableLazyListState = rememberReorderableLazyColumnState(quickSearchListState) { from, to ->
                         val fromIndex = from.index - 1
                         val toIndex = to.index - 1
-                        quickSearchList.apply {
-                            add(toIndex, removeAt(fromIndex))
-                        }
-                        coroutineScope.launchIO {
-                            val range = if (fromIndex < toIndex) fromIndex..toIndex else toIndex..fromIndex
-                            val list = quickSearchList.slice(range)
-                            list.zip(range).forEach { it.first.position = it.second }
-                            EhDB.updateQuickSearch(list)
-                        }
+                        quickSearchList.apply { add(toIndex, removeAt(fromIndex)) }
                         view.performHapticFeedback(draggingHapticFeedback)
                     }
+                    var fromIndex by remember { mutableIntStateOf(-1) }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         state = quickSearchListState,
@@ -426,7 +420,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                         stickyHeader {
                             HorizontalDivider()
                         }
-                        items(quickSearchList, key = { it.id!! }) { item ->
+                        itemsIndexed(quickSearchList, key = { _, item -> item.id!! }) { index, item ->
                             ReorderableItem(reorderableLazyListState, key = item.id!!) { isDragging ->
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = {
@@ -468,7 +462,24 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                                             Text(text = item.name)
                                         },
                                         trailingContent = {
-                                            DragHandle()
+                                            DragHandle(
+                                                onDragStarted = {
+                                                    fromIndex = index
+                                                },
+                                                onDragStopped = {
+                                                    if (fromIndex != -1) {
+                                                        if (fromIndex != index) {
+                                                            val range = if (fromIndex < index) fromIndex..index else index..fromIndex
+                                                            val toUpdate = quickSearchList.slice(range)
+                                                            toUpdate.zip(range).forEach { it.first.position = it.second }
+                                                            coroutineScope.launchIO {
+                                                                EhDB.updateQuickSearch(toUpdate)
+                                                            }
+                                                        }
+                                                        fromIndex = -1
+                                                    }
+                                                },
+                                            )
                                         },
                                     )
                                 }

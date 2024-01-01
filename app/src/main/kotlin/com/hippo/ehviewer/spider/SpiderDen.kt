@@ -15,8 +15,6 @@
  */
 package com.hippo.ehviewer.spider
 
-import android.os.ParcelFileDescriptor
-import android.os.ParcelFileDescriptor.MODE_READ_WRITE
 import com.hippo.ehviewer.EhApplication.Companion.imageCache as sCache
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.client.EhUtils.getSuitableTitle
@@ -26,11 +24,11 @@ import com.hippo.ehviewer.client.getImageKey
 import com.hippo.ehviewer.coil.read
 import com.hippo.ehviewer.coil.suspendEdit
 import com.hippo.ehviewer.download.downloadLocation
-import com.hippo.ehviewer.gallery.SUPPORT_IMAGE_EXTENSIONS
 import com.hippo.ehviewer.image.Image.UniFileSource
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.sendTo
 import com.hippo.unifile.UniFile
+import com.hippo.unifile.asUniFile
 import com.hippo.unifile.openOutputStream
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.statement.HttpResponse
@@ -72,13 +70,9 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
         val key = getImageKey(mGid, index)
         return runCatching {
             sCache.read(key) {
-                val extension = fixExtension("." + metadata.toFile().readText())
+                val extension = "." + metadata.toFile().readText()
                 val file = dir.createFile(perFilename(index, extension)) ?: return false
-                file.openFileDescriptor("w").use { outFd ->
-                    ParcelFileDescriptor.open(data.toFile(), MODE_READ_WRITE).use {
-                        it sendTo outFd
-                    }
-                }
+                data.asUniFile() sendTo file
                 true
             } ?: false
         }.onFailure {
@@ -117,7 +111,7 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
 
     private fun findDownloadFileForIndex(index: Int, extension: String): UniFile? {
         val dir = downloadDir ?: return null
-        val ext = fixExtension(".$extension")
+        val ext = ".$extension"
         return dir.createFile(perFilename(index, ext))
     }
 
@@ -155,7 +149,7 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
             val key = getImageKey(mGid, index)
             return sCache.suspendEdit(key) {
                 metadata.toFile().writeText(ext)
-                fops(UniFile.fromFile(data.toFile())!!)
+                fops(data.asUniFile())
             }
         }
         return false
@@ -173,34 +167,28 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
     }
 
     fun saveToUniFile(index: Int, file: UniFile): Boolean {
-        file.openFileDescriptor("w").use { toFd ->
-            val key = getImageKey(mGid, index)
+        val key = getImageKey(mGid, index)
 
-            // Read from diskCache first
-            sCache.read(key) {
-                runCatching {
-                    UniFile.fromFile(data.toFile())!!.openFileDescriptor("r").use {
-                        it sendTo toFd
-                    }
-                    return true
-                }.onFailure {
-                    it.printStackTrace()
-                    return false
-                }
+        // Read from diskCache first
+        sCache.read(key) {
+            runCatching {
+                data.asUniFile() sendTo file
+                return true
+            }.onFailure {
+                it.printStackTrace()
+                return false
             }
+        }
 
-            // Read from download dir
-            downloadDir?.let { uniFile ->
-                runCatching {
-                    findImageFile(uniFile, index)?.openFileDescriptor("r")?.use {
-                        it sendTo toFd
-                    }
-                }.onFailure {
-                    it.printStackTrace()
-                    return false
-                }.onSuccess {
-                    return true
-                }
+        // Read from download dir
+        downloadDir?.let { uniFile ->
+            runCatching {
+                requireNotNull(findImageFile(uniFile, index)) sendTo file
+            }.onFailure {
+                it.printStackTrace()
+                return false
+            }.onSuccess {
+                return true
             }
         }
         return false
@@ -217,9 +205,8 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
             val key = getImageKey(mGid, index)
             val snapshot = sCache.openSnapshot(key)
             if (snapshot != null) {
-                val source = UniFile.fromFile(snapshot.data.toFile())!!
                 return object : UniFileSource, AutoCloseable by snapshot {
-                    override val source = source
+                    override val source = snapshot.data.asUniFile()
                 }
             }
         }
@@ -233,8 +220,6 @@ class SpiderDen(mGalleryInfo: GalleryInfo) {
     }
 }
 
-private val COMPAT_IMAGE_EXTENSIONS = SUPPORT_IMAGE_EXTENSIONS + ".jpeg"
-
 /**
  * @param extension with dot
  */
@@ -242,15 +227,9 @@ fun perFilename(index: Int, extension: String?): String {
     return String.format(Locale.US, "%08d%s", index + 1, extension)
 }
 
-/**
- * @param extension with dot
- */
-private fun fixExtension(extension: String): String {
-    return extension.takeIf { SUPPORT_IMAGE_EXTENSIONS.contains(it) } ?: SUPPORT_IMAGE_EXTENSIONS[0]
-}
-
 private fun findImageFile(dir: UniFile, index: Int): UniFile? {
-    return COMPAT_IMAGE_EXTENSIONS.firstNotNullOfOrNull { dir.findFile(perFilename(index, it)) }
+    val head = perFilename(index, ".")
+    return dir.findFirst { name -> name.startsWith(head) }
 }
 
 suspend fun GalleryInfo.putToDownloadDir(): String {
@@ -262,5 +241,5 @@ suspend fun GalleryInfo.putToDownloadDir(): String {
 
 suspend fun getGalleryDownloadDir(gid: Long): UniFile? {
     val dirname = EhDB.getDownloadDirname(gid) ?: return null
-    return downloadLocation.subFile(dirname)
+    return downloadLocation / dirname
 }

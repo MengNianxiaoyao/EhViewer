@@ -1,24 +1,21 @@
-use catch_panic::catch_panic;
+use jni::objects::{JByteBuffer, JClass};
+use jni::sys::jint;
+use jni::JNIEnv;
 use jni_fn::jni_fn;
-use jnix::jni::objects::{JByteBuffer, JClass};
-use jnix::jni::sys::{jint, jobject};
-use jnix::jni::JNIEnv;
-use jnix::{IntoJava, JnixEnv};
-use jnix_macros::IntoJava;
+use parse_marshal_inplace;
 use quick_xml::escape::unescape;
+use serde::Serialize;
 use std::borrow::Cow;
 use std::ops::Index;
-use tl::{Node, Parser};
-use {check_html, parse_bytebuffer};
+use tl::{Node, Parser, VDom};
 use {get_element_by_id, get_vdom_first_element_by_class_name};
 use {get_first_element_by_class_name, query_childs_first_match_attr};
 use {get_node_attr, get_node_handle_attr, regex};
 use {EHGT_PREFIX, EX_PREFIX};
 
-#[derive(Default, IntoJava)]
+#[derive(Serialize)]
 #[allow(non_snake_case)]
-#[jnix(package = "com.hippo.ehviewer.client.data")]
-pub struct BaseGalleryInfo {
+struct BaseGalleryInfo {
     gid: i64,
     token: String,
     title: String,
@@ -40,9 +37,8 @@ pub struct BaseGalleryInfo {
     favoriteNote: Option<String>,
 }
 
-#[derive(Default, IntoJava)]
+#[derive(Serialize)]
 #[allow(non_snake_case)]
-#[jnix(package = "com.hippo.ehviewer.client.parser")]
 pub struct GalleryListResult {
     prev: Option<String>,
     next: Option<String>,
@@ -104,7 +100,7 @@ fn parse_uploader_and_pages(str: &str) -> (Option<String>, bool, i32) {
         .map(|grp| grp[1].to_string());
     let pages = match regex!(r"<div>(\d+) pages</div>").captures(str) {
         None => 0,
-        Some(grp) => grp[1].parse().unwrap(),
+        Some(grp) => grp[1].parse().unwrap_or(0),
     };
     (uploader, str.contains("style=\"opacity:0.5\""), pages)
 }
@@ -112,7 +108,7 @@ fn parse_uploader_and_pages(str: &str) -> (Option<String>, bool, i32) {
 fn parse_thumb_resolution(str: &str) -> (i32, i32) {
     match regex!(r"height:(\d+)px;width:(\d+)px").captures(str) {
         None => (0, 0),
-        Some(grp) => (grp[1].parse().unwrap(), grp[2].parse().unwrap()),
+        Some(grp) => (grp[1].parse().unwrap_or(0), grp[2].parse().unwrap_or(0)),
     }
 }
 
@@ -132,7 +128,7 @@ fn parse_gallery_info(node: &Node, parser: &Parser) -> Option<BaseGalleryInfo> {
     let (thumb, (thumb_height, thumb_width)) =
         match tag.query_selector(parser, "[data-src]")?.next() {
             None => match tag.query_selector(parser, "[src]")?.next() {
-                None => panic!("No thumb found"),
+                None => return None,
                 Some(thumb) => (
                     get_node_handle_attr(&thumb, parser, "src")?,
                     parse_thumb_resolution(get_node_handle_attr(&thumb, parser, "style")?),
@@ -193,25 +189,21 @@ fn parse_gallery_info(node: &Node, parser: &Parser) -> Option<BaseGalleryInfo> {
     })
 }
 
-#[no_mangle]
-#[catch_panic(default = "std::ptr::null_mut()")]
-#[allow(non_snake_case)]
-#[jni_fn("com.hippo.ehviewer.client.parser.GalleryListParserKt")]
-pub fn parseGalleryInfoList(
-    env: JNIEnv,
-    _class: JClass,
-    buffer: JByteBuffer,
-    limit: jint,
-) -> jobject {
-    let mut env = JnixEnv { env };
-    parse_bytebuffer(&mut env, buffer, limit, |dom, parser, _, str| {
-        check_html(str);
-        if str.contains("<p>You do not have any watched tags") {
-            panic!("No watched tags!")
-        }
-        if str.contains("No hits found</p>") || str.contains("No unfiltered results found") {
-            panic!("No hits found!")
-        }
+pub fn parse_info_list(
+    dom: &VDom,
+    parser: &Parser,
+    str: &str,
+) -> Result<GalleryListResult, &'static str> {
+    if !str.contains('<') {
+        return Err("No content!");
+    }
+    if str.contains("<p>You do not have any watched tags") {
+        return Err("No watched tags!");
+    }
+    if str.contains("No hits found</p>") || str.contains("No unfiltered results found") {
+        return Err("No hits found!");
+    }
+    let f = || {
         let itg = get_vdom_first_element_by_class_name(dom, "itg")?;
         let children = itg.children()?;
         let iter = children.top().iter();
@@ -241,9 +233,15 @@ pub fn parseGalleryInfoList(
             next,
             galleryInfoList: info,
         })
+    };
+    f().ok_or("No content")
+}
+
+#[no_mangle]
+#[allow(non_snake_case)]
+#[jni_fn("com.hippo.ehviewer.client.parser.GalleryListParserKt")]
+pub fn parseGalleryInfoList(mut env: JNIEnv, _: JClass, buffer: JByteBuffer, limit: jint) -> jint {
+    parse_marshal_inplace(&mut env, buffer, limit, |dom, parser, str| {
+        parse_info_list(dom, parser, str)
     })
-    .unwrap()
-    .into_java(&env)
-    .forget()
-    .into_raw()
 }

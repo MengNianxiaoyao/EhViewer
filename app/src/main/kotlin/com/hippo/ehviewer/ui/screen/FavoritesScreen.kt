@@ -31,11 +31,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.currentRecomposeScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -78,6 +78,7 @@ import com.hippo.ehviewer.ui.showDatePicker
 import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.rememberInVM
+import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.findActivity
 import com.hippo.ehviewer.util.mapToLongArray
 import com.ramcosta.composedestinations.annotation.Destination
@@ -96,7 +97,7 @@ import moe.tarsin.coroutines.runSuspendCatching
 fun FavouritesScreen(navigator: DestinationsNavigator) {
     // Meta State
     var urlBuilder by rememberSaveable { mutableStateOf(FavListUrlBuilder(favCat = Settings.recentFavCat)) }
-    var searchBarOffsetY by remember { mutableStateOf(0) }
+    var searchBarOffsetY by remember { mutableIntStateOf(0) }
 
     // Derived State
     val keyword = remember(urlBuilder) { urlBuilder.keyword.orEmpty() }
@@ -153,8 +154,8 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                         }.onFailure {
                             return@withIOContext LoadResult.Error(it)
                         }.getOrThrow()
-                        Settings.favCat = r.catArray
-                        Settings.favCount = r.countArray
+                        Settings.favCat = r.catArray.toTypedArray()
+                        Settings.favCount = r.countArray.toIntArray()
                         Settings.favCloudCount = r.countArray.sum()
                         urlBuilder.jumpTo = null
                         LoadResult.Page(r.galleryInfoList, r.prev, r.next)
@@ -221,7 +222,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
     var expanded by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(false) }
     val checkedInfoMap = remember { mutableStateMapOf<Long, BaseGalleryInfo>() }
-    val selectMode by rememberUpdatedState(checkedInfoMap.isNotEmpty())
+    val selectMode = checkedInfoMap.isNotEmpty()
     LockDrawer(selectMode)
 
     SearchBarScreen(
@@ -322,8 +323,6 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         }.mapLatest { it }
     }.collectAsState(hidden)
 
-    // Explicitly reallocate fabBuilder lambda to recompose secondary fab
-    val select = selectMode
     FabLayout(
         hidden = hideFab,
         expanded = expanded || selectMode,
@@ -333,7 +332,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         },
         autoCancel = !selectMode,
     ) {
-        if (!select) {
+        if (!selectMode) {
             onClick(EhIcons.Default.GoTo) {
                 coroutineScope.launch {
                     val date = dialogState.showDatePicker()
@@ -382,22 +381,22 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                 val dstCat = if (index == 0) FavListUrlBuilder.FAV_CAT_LOCAL else index - 1
                 val info = checkedInfoMap.run { toMap().values.also { clear() } }
                 if (srcCat != dstCat) {
-                    if (srcCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
-                        // Move from local to cloud
-                        EhDB.removeLocalFavorites(info)
-                        val galleryList = info.map { it.gid to it.token!! }
-                        runSuspendCatching {
+                    runSuspendCatching {
+                        if (srcCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
+                            // Move from local to cloud
+                            val galleryList = info.map { it.gid to it.token!! }
                             EhEngine.addFavorites(galleryList, dstCat)
-                        }
-                    } else if (dstCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
-                        // Move from cloud to local
-                        EhDB.putLocalFavorites(info)
-                    } else {
-                        // Move from cloud to cloud
-                        val gidArray = info.mapToLongArray(BaseGalleryInfo::gid)
-                        runSuspendCatching {
+                            EhDB.removeLocalFavorites(info)
+                        } else if (dstCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
+                            // Move from cloud to local
+                            EhDB.putLocalFavorites(info)
+                        } else {
+                            // Move from cloud to cloud
+                            val gidArray = info.mapToLongArray(BaseGalleryInfo::gid)
                             EhEngine.modifyFavorites(gidArray, srcCat, dstCat)
                         }
+                    }.onFailure {
+                        activity.showTip(ExceptionUtils.getReadableString(it))
                     }
                     data.refresh()
                 }
