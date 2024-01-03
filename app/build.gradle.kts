@@ -65,7 +65,7 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 180049
-        versionName = "1.10.2"
+        versionName = "1.10.2.1"
         versionNameSuffix = "-SNAPSHOT"
         resourceConfigurations.addAll(
             listOf(
@@ -103,7 +103,7 @@ android {
             versionNameSuffix = "-M"
             externalNativeBuild {
                 cmake {
-                    targets += "noop"
+                    arguments("-DMARSHMALLOW=1")
                 }
             }
             compileOptions {
