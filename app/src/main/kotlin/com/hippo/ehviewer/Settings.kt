@@ -150,7 +150,7 @@ object Settings : DataStorePreferences(null) {
     var needSignIn by boolPref("need_sign_in", true)
     var harmonizeCategoryColor by boolPref("harmonize_category_color", true)
     var preloadThumbAggressively by boolPref("preload_thumb_aggressively", false)
-    var dF by boolPref(KEY_DOMAIN_FRONTING, false)
+    var dF by boolPref(KEY_DOMAIN_FRONTING, true)
     var downloadOriginImage by boolPref("download_origin_image", false)
     var enableCronet by boolPref("enable_cronet", true)
     var recentFavCat by intPref("recent_fav_cat", FavListUrlBuilder.FAV_CAT_LOCAL)
@@ -168,7 +168,7 @@ object Settings : DataStorePreferences(null) {
     var displayName by stringOrNullPref("display_name", null)
     var avatar by stringOrNullPref("avatar", null)
     var bypassVpn by boolPref("bypass_vpn", true)
-    var enableQuic by boolPref("enable_quic", true)
+    var enableQuic by boolPref("enable_quic", false)
     var dohUrl by stringPref("doh_url", "https://77.88.8.8/dns-query")
     var language by stringPref("app_language", "system").observed { updateWhenLocaleChanges() }
     var lastDawnDay by longPref("last_dawn_day", 0)

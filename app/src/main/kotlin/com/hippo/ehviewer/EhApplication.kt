@@ -29,7 +29,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.coroutineScope
 import coil3.SingletonImageLoader
 import coil3.asCoilImage
-import coil3.decode.ImageDecoderDecoder
+import coil3.decode.AnimatedImageDecoderDecoder
+import coil3.decode.GifDecoder
 import coil3.fetch.NetworkFetcher
 import coil3.request.crossfade
 import coil3.util.DebugLogger
@@ -109,9 +110,7 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
             handler?.uncaughtException(t, e)
         }
         super.onCreate()
-        if (isAtLeastP) {
-            System.loadLibrary("ehviewer")
-        }
+        System.loadLibrary("ehviewer")
         System.loadLibrary("ehviewer_rust")
         ReadableTime.initialize(this)
         lifecycleScope.launchIO {
@@ -185,18 +184,21 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-            galleryDetailCache.evictAll()
+            // Keep one entry for GalleryCommentsScreen
+            galleryDetailCache.trimToSize(1)
         }
     }
 
     override fun newImageLoader(context: Context) = context.imageLoader {
         components {
             add(NetworkFetcher.Factory(unsafeLazy { ktorClient }))
-            if (isAtLeastP) {
-                add { result, options, _ -> ImageDecoderDecoder(result.source, options, false) }
-            }
             add(MergeInterceptor)
             add(DownloadThumbInterceptor)
+            if (isAtLeastP) {
+                add(AnimatedImageDecoderDecoder.Factory(false))
+            } else {
+                add(GifDecoder.Factory())
+            }
         }
         diskCache(imageCache)
         crossfade(300)
