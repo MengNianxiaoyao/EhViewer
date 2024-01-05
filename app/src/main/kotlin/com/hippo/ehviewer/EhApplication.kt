@@ -33,6 +33,7 @@ import coil3.decode.AnimatedImageDecoderDecoder
 import coil3.decode.GifDecoder
 import coil3.fetch.NetworkFetcher
 import coil3.request.crossfade
+import coil3.serviceLoaderEnabled
 import coil3.util.DebugLogger
 import com.google.net.cronet.okhttptransport.RedirectStrategy.withoutRedirects
 import com.hippo.ehviewer.client.EhCookieStore
@@ -61,12 +62,12 @@ import com.hippo.ehviewer.util.Crash
 import com.hippo.ehviewer.util.FavouriteStatusRouter
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.ReadableTime
+import com.hippo.ehviewer.util.delegateLazy
 import com.hippo.ehviewer.util.isAtLeastP
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.isAtLeastS
 import com.hippo.ehviewer.util.isCronetAvailable
 import com.hippo.ehviewer.util.resettableLazy
-import com.hippo.ehviewer.util.unsafeLazy
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withUIContext
@@ -191,7 +192,8 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
 
     override fun newImageLoader(context: Context) = context.imageLoader {
         components {
-            add(NetworkFetcher.Factory(unsafeLazy { ktorClient }))
+            serviceLoaderEnabled(false)
+            add(NetworkFetcher.Factory(delegateLazy { ktorClient }))
             add(MergeInterceptor)
             add(DownloadThumbInterceptor)
             if (isAtLeastP) {
