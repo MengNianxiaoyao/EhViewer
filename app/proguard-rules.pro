@@ -16,13 +16,9 @@
 
 -dontwarn org.conscrypt.Conscrypt
 
-# Apache5 Http Client
--dontwarn org.ietf.jgss.GSSContext
--dontwarn org.ietf.jgss.GSSCredential
--dontwarn org.ietf.jgss.GSSException
--dontwarn org.ietf.jgss.GSSManager
--dontwarn org.ietf.jgss.GSSName
--dontwarn org.ietf.jgss.Oid
-
 -allowaccessmodification
 -repackageclasses
+
+# A resource is loaded with a relative path so the package of this class must be preserved.
+-keeppackagenames okhttp3.internal.publicsuffix.*
+-adaptresourcefilenames okhttp3/internal/publicsuffix/PublicSuffixDatabase.gz

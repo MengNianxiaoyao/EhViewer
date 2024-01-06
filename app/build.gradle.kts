@@ -65,8 +65,8 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 180049
-        versionName = "1.10.2.2"
-        versionNameSuffix = "-SNAPSHOT"
+        versionName = "1.10.2.4"
+        versionNameSuffix = "-cc"
         resourceConfigurations.addAll(
             listOf(
                 "zh",
@@ -156,7 +156,6 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/**"
-            excludes += "/okhttp3/**"
             excludes += "/kotlin/**"
             excludes += "**.txt"
             excludes += "**.bin"
@@ -238,10 +237,6 @@ dependencies {
     // https://square.github.io/okhttp/changelogs/changelog/
     implementation(platform(libs.okhttp.bom))
     implementation(libs.bundles.okhttp)
-    implementation(platform("com.squareup.okhttp3:okhttp-bom:5.0.0-alpha.12"))
-    implementation("com.squareup.okhttp3:okhttp-android")
-    implementation("com.squareup.okhttp3:okhttp-coroutines")
-    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps")
 
     implementation(libs.okio.jvm)
 
