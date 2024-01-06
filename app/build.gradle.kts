@@ -257,7 +257,7 @@ dependencies {
 
     implementation(libs.bundles.ktor)
 
-    implementation("com.google.guava:guava:32.1.3-jre")
+    implementation("com.google.guava:guava:33.0.0-jre")
 
     implementation(libs.bundles.kotlinx.serialization)
 
