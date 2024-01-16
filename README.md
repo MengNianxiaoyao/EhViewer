@@ -9,7 +9,7 @@
 | Default     | Android 9+, 完全支持       |
 | Marshmallow | Android 6.0-8.1, 有限支持* |
 
-\* 不支持压缩包和 GIF
+\* 不支持部分压缩包
 
 ## 缺陷和功能请求
 

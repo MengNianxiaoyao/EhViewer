@@ -194,9 +194,6 @@ pub fn parse_info_list(
     parser: &Parser,
     str: &str,
 ) -> Result<GalleryListResult, &'static str> {
-    if !str.contains('<') {
-        return Err("No content!");
-    }
     if str.contains("<p>You do not have any watched tags") {
         return Err("No watched tags!");
     }
@@ -241,7 +238,7 @@ pub fn parse_info_list(
 #[allow(non_snake_case)]
 #[jni_fn("com.hippo.ehviewer.client.parser.GalleryListParserKt")]
 pub fn parseGalleryInfoList(mut env: JNIEnv, _: JClass, buffer: JByteBuffer, limit: jint) -> jint {
-    parse_marshal_inplace(&mut env, buffer, limit, |dom, parser, str| {
-        parse_info_list(dom, parser, str)
+    parse_marshal_inplace(&mut env, buffer, limit, |dom, str| {
+        parse_info_list(dom, dom.parser(), str)
     })
 }

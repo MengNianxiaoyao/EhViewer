@@ -29,9 +29,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.coroutineScope
 import coil3.SingletonImageLoader
 import coil3.asCoilImage
-import coil3.decode.AnimatedImageDecoderDecoder
-import coil3.decode.GifDecoder
-import coil3.fetch.NetworkFetcher
+import coil3.gif.AnimatedImageDecoder
+import coil3.network.NetworkFetcher
 import coil3.request.crossfade
 import coil3.serviceLoaderEnabled
 import coil3.util.DebugLogger
@@ -197,9 +196,7 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
             add(MergeInterceptor)
             add(DownloadThumbInterceptor)
             if (isAtLeastP) {
-                add(AnimatedImageDecoderDecoder.Factory(false))
-            } else {
-                add(GifDecoder.Factory())
+                add(AnimatedImageDecoder.Factory(false))
             }
         }
         diskCache(imageCache)

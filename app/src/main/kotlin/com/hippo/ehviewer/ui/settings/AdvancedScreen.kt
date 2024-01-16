@@ -39,8 +39,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.hippo.ehviewer.BuildConfig
 import com.hippo.ehviewer.EhApplication
-import com.hippo.ehviewer.EhApplication.Companion.ktorClient
-import com.hippo.ehviewer.EhApplication.Companion.noRedirectKtorClient
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
@@ -159,11 +157,6 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                 summary = if (enableCronet) "Cronet" else "OkHttp",
             ) {
                 coroutineScope.launch {
-                    fun reset() {
-                        ktorClient = ktorClient.apply { close() }
-                        noRedirectKtorClient = noRedirectKtorClient.apply { close() }
-                    }
-
                     dialogState.awaitPermissionOrCancel(
                         title = R.string.settings_advanced_http_engine,
                         showCancelButton = false,
@@ -175,7 +168,6 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                                     onClick = {
                                         enableCronet = false
                                         enableDf = true
-                                        reset()
                                     },
                                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                                 ) {
@@ -186,7 +178,6 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                                     onClick = {
                                         enableCronet = true
                                         enableDf = false
-                                        reset()
                                     },
                                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                                     enabled = isCronetAvailable,
@@ -262,6 +253,10 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
             SwitchPreference(
                 title = stringResource(id = R.string.preload_thumb_aggressively),
                 value = Settings::preloadThumbAggressively,
+            )
+            SwitchPreference(
+                title = stringResource(id = R.string.predictive_nav_anim),
+                value = Settings.predictiveNavAnim::value,
             )
             IntSliderPreference(
                 maxValue = 5,

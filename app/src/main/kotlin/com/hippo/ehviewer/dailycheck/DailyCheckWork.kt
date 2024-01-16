@@ -28,7 +28,6 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -48,18 +47,12 @@ class DailyCheckWork(context: Context, workerParams: WorkerParameters) :
     }
 }
 
-val schedHour
-    get() = Settings.requestNewsTimerHour.takeUnless { it == -1 } ?: 0
-
-val schedMinute
-    get() = Settings.requestNewsTimerMinute.takeUnless { it == -1 } ?: 0
-
 private fun getDailyCheckWorkRequest(): PeriodicWorkRequest {
     val now = Clock.System.now()
     val timeZone = TimeZone.currentSystemDefault()
     val whenToWork = LocalDateTime(
         now.toLocalDateTime(timeZone).date,
-        LocalTime(schedHour, schedMinute),
+        LocalTime.fromSecondOfDay(Settings.requestNewsTime),
     ).toInstant(timeZone)
     val initialDelay = (whenToWork - now).run { if (isNegative()) plus(1.days) else this }
     val constraints = Constraints.Builder()
@@ -77,7 +70,7 @@ fun updateDailyCheckWork(context: Context) {
     if (Settings.requestNews) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
             getDailyCheckWorkRequest(),
         )
     } else {
@@ -85,12 +78,13 @@ fun updateDailyCheckWork(context: Context) {
     }
 }
 
+val today
+    get() = (Clock.System.now().epochSeconds / 86400).toInt()
+
 suspend fun checkDawn() = runCatching {
-    val now = Clock.System.now()
-    val last = Instant.fromEpochSeconds(Settings.lastDawnTime)
-    if (EhCookieStore.hasSignedIn() && now > last + 1.days) {
+    if (EhCookieStore.hasSignedIn() && Settings.lastDawnDays != today) {
         EhEngine.getNews(true)?.let {
-            Settings.lastDawnTime = now.epochSeconds
+            Settings.lastDawnDays = today
             showEventNotification(it)
         }
     }

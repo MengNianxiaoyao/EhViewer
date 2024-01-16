@@ -50,6 +50,7 @@ import com.hippo.ehviewer.client.parser.TorrentResult
 import com.hippo.ehviewer.client.parser.VoteCommentResult
 import com.hippo.ehviewer.client.parser.VoteTagParser
 import com.hippo.ehviewer.dailycheck.showEventNotification
+import com.hippo.ehviewer.dailycheck.today
 import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ReadableTime
 import com.hippo.ehviewer.util.StatusCodeException
@@ -68,7 +69,6 @@ import java.nio.channels.FileChannel
 import kotlin.math.ceil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonArray
@@ -131,6 +131,12 @@ fun rethrowExactly(code: Int, body: Either<String, ByteBuffer>, e: Throwable): N
 
     if (e is ParseException || e is SerializationException) {
         body.onLeft { if ("<" !in it) throw EhException(it) }
+        when (val message = e.cause?.message) {
+            "No hits found!" -> throw EhException(R.string.gallery_list_empty_hit)
+            "No watched tags!" -> throw EhException(R.string.gallery_list_empty_hit_subscription)
+            "Not logged in!" -> throw NotLoggedInException()
+            is String -> if (message.startsWith("Your IP address")) throw EhException(message)
+        }
         if (Settings.saveParseErrorBody) body.saveParseError(e)
         throw EhException(appCtx.getString(R.string.error_parse_error), e)
     }
@@ -217,7 +223,7 @@ object EhEngine {
     suspend fun getGalleryDetail(url: String) = ehRequest(url, EhUrl.referer).fetchUsingAsText {
         val eventPane = EventPaneParser.parse(this)
         if (eventPane != null) {
-            Settings.lastDawnTime = Clock.System.now().epochSeconds
+            Settings.lastDawnDays = today
             showEventNotification(eventPane)
         }
         GalleryDetailParser.parse(this)

@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import splitties.preferences.edit
 
 object DownloadManager : OnSpiderListener {
@@ -82,6 +84,8 @@ object DownloadManager : OnSpiderListener {
 
     private val mutableNotifyFlow = MutableSharedFlow<DownloadInfo>(extraBufferCapacity = 1)
     val notifyFlow = mutableNotifyFlow.asSharedFlow()
+
+    private val mutex = Mutex()
 
     init {
         assertNotMainThread()
@@ -134,35 +138,37 @@ object DownloadManager : OnSpiderListener {
     }
 
     private suspend fun ensureDownload() {
-        if (mCurrentTask != null) {
-            // Only one download
-            return
-        }
-
-        // Get download from wait list
-        if (!mWaitList.isEmpty()) {
-            val info = mWaitList.removeFirst()
-            val spider = SpiderQueen.obtainSpiderQueen(info, SpiderQueen.MODE_DOWNLOAD)
-            mCurrentTask = info
-            mCurrentSpider = spider
-            spider.addOnSpiderListener(this)
-            info.state = DownloadInfo.STATE_DOWNLOAD
-            info.speed = -1
-            info.remaining = -1
-            info.total = -1
-            info.finished = 0
-            info.downloaded = 0
-            info.legacy = -1
-            // Update in DB
-            EhDB.putDownloadInfo(info)
-            // Start speed count
-            mSpeedReminder.start()
-            // Notify start downloading
-            if (mDownloadListener != null) {
-                mDownloadListener!!.onStart(info)
+        mutex.withLock {
+            if (mCurrentTask != null) {
+                // Only one download
+                return
             }
-            // Notify state update
-            mutableNotifyFlow.tryEmit(info)
+
+            // Get download from wait list
+            if (!mWaitList.isEmpty()) {
+                val info = mWaitList.removeFirst()
+                val spider = SpiderQueen.obtainSpiderQueen(info, SpiderQueen.MODE_DOWNLOAD)
+                mCurrentTask = info
+                mCurrentSpider = spider
+                spider.addOnSpiderListener(this)
+                info.state = DownloadInfo.STATE_DOWNLOAD
+                info.speed = -1
+                info.remaining = -1
+                info.total = -1
+                info.finished = 0
+                info.downloaded = 0
+                info.legacy = -1
+                // Update in DB
+                EhDB.putDownloadInfo(info)
+                // Start speed count
+                mSpeedReminder.start()
+                // Notify start downloading
+                if (mDownloadListener != null) {
+                    mDownloadListener!!.onStart(info)
+                }
+                // Notify state update
+                mutableNotifyFlow.emit(info)
+            }
         }
     }
 
@@ -183,7 +189,7 @@ object DownloadManager : OnSpiderListener {
                 // Update in DB
                 EhDB.putDownloadInfo(info)
                 // Notify state update
-                mutableNotifyFlow.tryEmit(info)
+                mutableNotifyFlow.emit(info)
                 // Make sure download is running
                 ensureDownload()
             }
@@ -213,7 +219,7 @@ object DownloadManager : OnSpiderListener {
             EhDB.putDownloadInfo(info)
 
             // Notify
-            mutableNotifyFlow.tryEmit(info)
+            mutableNotifyFlow.emit(info)
             // Make sure download is running
             ensureDownload()
 
@@ -234,7 +240,7 @@ object DownloadManager : OnSpiderListener {
             updateList.onEach {
                 it.state = DownloadInfo.STATE_WAIT
                 EhDB.putDownloadInfo(it)
-                mutableNotifyFlow.tryEmit(it)
+                mutableNotifyFlow.emit(it)
             }
             mWaitList.addAll(updateList)
             ensureDownload()
@@ -270,7 +276,7 @@ object DownloadManager : OnSpiderListener {
             updateList.onEach {
                 it.state = DownloadInfo.STATE_WAIT
                 EhDB.putDownloadInfo(it)
-                mutableNotifyFlow.tryEmit(it)
+                mutableNotifyFlow.emit(it)
             }
             mWaitList.addAll(updateList)
             ensureDownload()
@@ -329,14 +335,14 @@ object DownloadManager : OnSpiderListener {
         EhDB.putDownloadInfo(info)
 
         // Notify
-        mutableNotifyFlow.tryEmit(info)
+        mutableNotifyFlow.emit(info)
     }
 
     suspend fun stopDownload(gid: Long) {
         val info = stopDownloadInternal(gid)
         if (info != null) {
             // Update listener
-            mutableNotifyFlow.tryEmit(info)
+            mutableNotifyFlow.emit(info)
             // Ensure download
             ensureDownload()
         }
@@ -346,7 +352,7 @@ object DownloadManager : OnSpiderListener {
         val info = stopCurrentDownloadInternal()
         if (info != null) {
             // Update listener
-            mutableNotifyFlow.tryEmit(info)
+            mutableNotifyFlow.emit(info)
             // Ensure download
             ensureDownload()
         }
@@ -357,7 +363,7 @@ object DownloadManager : OnSpiderListener {
 
         // Update listener
         gidList.mapNotNull { mAllInfoMap[it] }.forEach {
-            mutableNotifyFlow.tryEmit(it)
+            mutableNotifyFlow.emit(it)
         }
 
         // Ensure download
@@ -365,19 +371,22 @@ object DownloadManager : OnSpiderListener {
     }
 
     suspend fun stopAllDownload() {
-        // Stop all in wait list
-        for (info in mWaitList) {
-            info.state = DownloadInfo.STATE_NONE
-            // Update in DB
-            EhDB.putDownloadInfo(info)
+        mutex.withLock {
+            // Stop all in wait list
+            for (info in mWaitList) {
+                info.state = DownloadInfo.STATE_NONE
+                // Update in DB
+                EhDB.putDownloadInfo(info)
 
-            // Notify
-            mutableNotifyFlow.tryEmit(info)
+                // Notify
+                mutableNotifyFlow.emit(info)
+            }
+            mWaitList.clear()
+
+            // Stop current
+            val info = stopCurrentDownloadInternal()
+            info?.let { mutableNotifyFlow.emit(it) }
         }
-        mWaitList.clear()
-
-        // Stop current
-        stopCurrentDownloadInternal()
     }
 
     suspend fun deleteDownload(gid: Long, deleteFiles: Boolean = false) {
@@ -398,7 +407,7 @@ object DownloadManager : OnSpiderListener {
                 if (index >= 0) {
                     list.remove(info)
                     // Update listener
-                    mutableNotifyFlow.tryEmit(info)
+                    mutableNotifyFlow.emit(info)
                 }
             }
 
@@ -421,7 +430,7 @@ object DownloadManager : OnSpiderListener {
         allInfoList.removeAll(list.toSet())
 
         // Update listener
-        list.forEach { mutableNotifyFlow.tryEmit(it) }
+        list.forEach { mutableNotifyFlow.emit(it) }
 
         // Ensure download
         ensureDownload()
@@ -434,8 +443,7 @@ object DownloadManager : OnSpiderListener {
         val list = allInfoList.slice(range)
         val limit = allInfoList.size - 1
         list.zip(range).forEach { it.first.position = limit - it.second }
-        val label = allInfoList[fromPosition].label
-        getInfoListForLabel(label)!!.sortByPositionDescending()
+        getInfoListForLabel(info.label)!!.sortByPositionDescending()
         return list
     }
 
@@ -815,7 +823,9 @@ object DownloadManager : OnSpiderListener {
                         Log.e(TAG, "Current task is null, but it should not be")
                     } else {
                         info.total = mPages
-                        mutableNotifyFlow.tryEmit(info)
+                        launchIO {
+                            mutableNotifyFlow.emit(info)
+                        }
                     }
                 }
 
@@ -844,7 +854,9 @@ object DownloadManager : OnSpiderListener {
                         if (mDownloadListener != null) {
                             mDownloadListener!!.onGetPage(info)
                         }
-                        mutableNotifyFlow.tryEmit(info)
+                        launchIO {
+                            mutableNotifyFlow.emit(info)
+                        }
                     }
                 }
 
@@ -857,7 +869,9 @@ object DownloadManager : OnSpiderListener {
                         info.finished = mFinished
                         info.downloaded = mDownloaded
                         info.total = mTotal
-                        mutableNotifyFlow.tryEmit(info)
+                        launchIO {
+                            mutableNotifyFlow.emit(info)
+                        }
                     }
                 }
 
@@ -896,7 +910,7 @@ object DownloadManager : OnSpiderListener {
                             if (mDownloadListener != null) {
                                 mDownloadListener!!.onFinish(info)
                             }
-                            mutableNotifyFlow.tryEmit(info)
+                            mutableNotifyFlow.emit(info)
                             // Start next download
                             ensureDownload()
                         }
@@ -982,7 +996,9 @@ object DownloadManager : OnSpiderListener {
                 if (mDownloadListener != null) {
                     mDownloadListener!!.onDownload(info)
                 }
-                mutableNotifyFlow.tryEmit(info)
+                launchIO {
+                    mutableNotifyFlow.emit(info)
+                }
             }
             mBytesRead = 0
             if (!mStop) {

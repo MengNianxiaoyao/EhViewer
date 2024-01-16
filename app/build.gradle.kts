@@ -64,8 +64,8 @@ android {
         applicationId = "moe.tarsin.ehviewer"
         minSdk = 28
         targetSdk = 34
-        versionCode = 180049
-        versionName = "1.10.2.4"
+        versionCode = 180050
+        versionName = "1.10.3"
         versionNameSuffix = "-cc"
         resourceConfigurations.addAll(
             listOf(
@@ -101,11 +101,6 @@ android {
             minSdk = 23
             applicationIdSuffix = ".m"
             versionNameSuffix = "-M"
-            externalNativeBuild {
-                cmake {
-                    arguments("-DMARSHMALLOW=1")
-                }
-            }
             compileOptions {
                 isCoreLibraryDesugaringEnabled = true
             }
@@ -243,6 +238,7 @@ dependencies {
     implementation(libs.diff)
 
     implementation(libs.aboutlibraries.core)
+    implementation(libs.aboutlibraries.compose.m3)
 
     implementation(libs.insetter) // Dead Dependency
 
@@ -277,7 +273,7 @@ configurations.all {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 ksp {
