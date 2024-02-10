@@ -154,7 +154,7 @@ object Settings : DataStorePreferences(null) {
     var dF by boolPref(KEY_DOMAIN_FRONTING, true)
     var downloadOriginImage by boolPref("download_origin_image", false)
     var bypassVpn by boolPref("bypass_vpn", true)
-    var enableQuic by boolPref("enable_quic", false).observed { updateWhenEnableCronetChanges() }
+    var enableQuic by boolPref("enable_quic", false)
     var recentFavCat by intPref("recent_fav_cat", FavListUrlBuilder.FAV_CAT_LOCAL)
     var defaultFavSlot by intPref("default_favorite_slot", -2)
     var securityDelay by intPref("require_unlock_delay", 0)

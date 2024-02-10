@@ -15,19 +15,20 @@
  */
 package com.hippo.ehviewer.gallery
 
+import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.image.Image
 import com.hippo.ehviewer.spider.SpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.obtainSpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.releaseSpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.OnSpiderListener
-import com.hippo.ehviewer.util.SimpleHandler
 import com.hippo.unifile.UniFile
-import java.util.Locale
 
-class EhPageLoader(private val mGalleryInfo: GalleryInfo) : PageLoader2(), OnSpiderListener {
+class EhPageLoader(private val mGalleryInfo: GalleryInfo, startPage: Int) :
+    PageLoader2(mGalleryInfo.gid, startPage), OnSpiderListener {
     private lateinit var mSpiderQueen: SpiderQueen
     override fun start() {
+        super.start()
         if (!::mSpiderQueen.isInitialized) {
             mSpiderQueen = obtainSpiderQueen(mGalleryInfo, SpiderQueen.MODE_READ)
             mSpiderQueen.addOnSpiderListener(this)
@@ -37,38 +38,19 @@ class EhPageLoader(private val mGalleryInfo: GalleryInfo) : PageLoader2(), OnSpi
     override fun stop() {
         super.stop()
         mSpiderQueen.removeOnSpiderListener(this)
-        // Activity recreate may called, so wait 0.5s
-        SimpleHandler.postDelayed(ReleaseTask(mSpiderQueen), 500)
+        releaseSpiderQueen(mSpiderQueen, SpiderQueen.MODE_READ)
     }
 
-    override val startPage
-        get() = mSpiderQueen.startPage
-
-    override fun getImageFilename(index: Int): String {
-        return String.format(
-            Locale.US,
-            "%d-%s-%08d",
-            mGalleryInfo.gid,
-            mGalleryInfo.token,
-            index + 1,
-        )
+    override val title by lazy {
+        EhUtils.getSuitableTitle(mGalleryInfo)
     }
 
-    override fun getImageFilenameWithExtension(index: Int): String {
-        val filename = getImageFilename(index)
-        return mSpiderQueen.getExtension(index)?.let { "$filename.$it" } ?: filename
+    override fun getImageExtension(index: Int): String {
+        return mSpiderQueen.getExtension(index)!!
     }
 
     override fun save(index: Int, file: UniFile): Boolean {
         return mSpiderQueen.save(index, file)
-    }
-
-    override fun save(index: Int, dir: UniFile, filename: String): UniFile? {
-        return mSpiderQueen.save(index, dir, filename)
-    }
-
-    override fun putStartPage(page: Int) {
-        mSpiderQueen.putStartPage(page)
     }
 
     override val size: Int
@@ -83,7 +65,7 @@ class EhPageLoader(private val mGalleryInfo: GalleryInfo) : PageLoader2(), OnSpi
     }
 
     override suspend fun awaitReady(): Boolean {
-        return mSpiderQueen.awaitReady()
+        return super.awaitReady() && mSpiderQueen.awaitReady()
     }
 
     override val isReady: Boolean
@@ -130,12 +112,5 @@ class EhPageLoader(private val mGalleryInfo: GalleryInfo) : PageLoader2(), OnSpi
 
     override fun preloadPages(pages: List<Int>, pair: Pair<Int, Int>) {
         mSpiderQueen.preloadPages(pages, pair)
-    }
-
-    private class ReleaseTask(private var mSpiderQueen: SpiderQueen?) : Runnable {
-        override fun run() {
-            mSpiderQueen?.let { releaseSpiderQueen(it, SpiderQueen.MODE_READ) }
-            mSpiderQueen = null
-        }
     }
 }

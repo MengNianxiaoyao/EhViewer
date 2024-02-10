@@ -97,7 +97,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
-import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.data.ListUrlBuilder
 import com.hippo.ehviewer.client.parser.GalleryDetailUrlParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
@@ -107,6 +106,7 @@ import com.hippo.ehviewer.download.downloadLocation
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.filled.Subscriptions
 import com.hippo.ehviewer.image.Image.Companion.decodeBitmap
+import com.hippo.ehviewer.ui.destinations.DownloadScreenDestination
 import com.hippo.ehviewer.ui.destinations.DownloadsScreenDestination
 import com.hippo.ehviewer.ui.destinations.FavouritesScreenDestination
 import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
@@ -114,7 +114,6 @@ import com.hippo.ehviewer.ui.destinations.GalleryListScreenDestination
 import com.hippo.ehviewer.ui.destinations.HistoryScreenDestination
 import com.hippo.ehviewer.ui.destinations.HomePageScreenDestination
 import com.hippo.ehviewer.ui.destinations.ProgressScreenDestination
-import com.hippo.ehviewer.ui.destinations.SelectSiteScreenDestination
 import com.hippo.ehviewer.ui.destinations.SettingsScreenDestination
 import com.hippo.ehviewer.ui.destinations.SignInScreenDestination
 import com.hippo.ehviewer.ui.destinations.SubscriptionScreenDestination
@@ -238,9 +237,35 @@ class MainActivity : EhActivity() {
                 callback()
             }
 
+            suspend fun DialogState.checkDownloadLocation() {
+                val valid = withIOContext { downloadLocation.ensureDir() }
+                if (!valid) {
+                    awaitPermissionOrCancel(
+                        confirmText = R.string.open_settings,
+                        title = R.string.waring,
+                        showCancelButton = false,
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.invalid_download_location),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    navController.navigate(DownloadScreenDestination)
+                }
+            }
+
             LaunchedEffect(Unit) {
-                launch { dialogState.checkDownloadLocation() }.join()
-                launch { dialogState.checkAppLinkVerify() }
+                runCatching { dialogState.checkDownloadLocation() }
+                runCatching { dialogState.checkAppLinkVerify() }
+                runSuspendCatching {
+                    withIOContext {
+                        AppUpdater.checkForUpdate()?.let {
+                            dialogState.showNewVersion(this@MainActivity, it)
+                        }
+                    }
+                }.onFailure {
+                    showTip(getString(R.string.update_failed, ExceptionUtils.getReadableString(it)))
+                }
             }
 
             val cannotParse = stringResource(R.string.error_cannot_parse_the_url)
@@ -286,17 +311,6 @@ class MainActivity : EhActivity() {
                 }
             }
 
-            LaunchedEffect(Unit) {
-                runSuspendCatching {
-                    withIOContext {
-                        AppUpdater.checkForUpdate()?.let {
-                            dialogState.showNewVersion(this@MainActivity, it)
-                        }
-                    }
-                }.onFailure {
-                    showTip(getString(R.string.update_failed, ExceptionUtils.getReadableString(it)))
-                }
-            }
             val snackbarState = remember { SnackbarHostState() }
             LaunchedEffect(Unit) {
                 tipFlow.collectLatest {
@@ -424,7 +438,7 @@ class MainActivity : EhActivity() {
                                     DestinationsNavHost(
                                         navGraph = NavGraphs.root,
                                         startRoute = if (Settings.needSignIn) {
-                                            if (EhCookieStore.hasSignedIn()) SelectSiteScreenDestination else SignInScreenDestination
+                                            SignInScreenDestination
                                         } else {
                                             StartDestination
                                         },
@@ -457,7 +471,7 @@ class MainActivity : EhActivity() {
                 awaitPermissionOrCancel(
                     confirmText = R.string.open_settings,
                     title = R.string.app_link_not_verified_title,
-                    onDismiss = {
+                    onCancelButtonClick = {
                         if (checked) Settings.appLinkVerifyTip = true
                     },
                 ) {
@@ -505,22 +519,6 @@ class MainActivity : EhActivity() {
                     // .addCapability(NetworkCapabilities.NET_CAPABILITY_FOREGROUND)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                 connectivityManager.registerNetworkCallback(builder.build(), mNetworkCallback)
-            }
-        }
-    }
-
-    private suspend fun DialogState.checkDownloadLocation() {
-        val valid = withIOContext { downloadLocation.ensureDir() }
-        if (!valid) {
-            awaitPermissionOrCancel(
-                confirmText = R.string.get_it,
-                showCancelButton = false,
-                title = R.string.waring,
-            ) {
-                Text(
-                    text = stringResource(id = R.string.invalid_download_location),
-                    style = MaterialTheme.typography.titleMedium,
-                )
             }
         }
     }

@@ -31,13 +31,10 @@
     <string name="sign_in">ลงชื่อเข้าใช้</string>
     <string name="register">ลงทะเบียน</string>
     <string name="sign_in_via_webview">ลงชื่อเข้าใช้ผ่านมุมมองเว็บไซต์</string>
-    <string name="sign_in_via_cookies">ลงชื่อเข้าใช้ผ่านคุกกี้</string>
     <string name="sign_in_first">โปรดลงชื่อเข้าใช้ก่อนเป็นอันดับแรก</string>
 
-    <string name="cookie_explain">คุกกี้คือชิ้นส่วนข้อมูลเล็กๆที่ถูกจัดเก็บอยู่ในเว็บเบราเซอร์ ถ้าไม่รู้มันคืออะไรก็เปิด Google หาสิ \n\nกรุณากรอกข้อมูลคุกกี้เพื่อลงชื่อเข้าใช้ระบบ</string>
     <string name="text_is_empty">ข้อความห้ามเว้นว่างไว้</string>
     <string name="waring">คำเตือน</string>
-    <string name="wrong_cookie_warning">ดูเหมือนว่าคุกกี้ที่คุณกรอกมานั้นมันผิด คุณลองตรวจสอบใหม่ดูอีกรอบ</string>
 
     <string name="invalid_download_location">ดูเหมือนที่อยู่ในการดาวน์โหลดนั้นไม่พร้อมใช้งาน โปรดตั้งค่าในเมนูการตั้งค่า</string>
 
@@ -59,7 +56,6 @@
     <string name="error_509">509</string>
     <string name="error_invalid_url">URL ไม่ถูกต้อง</string>
     <string name="error_get_ptoken_error">การรับ pToken มีปัญหา</string>
-    <string name="error_cant_create_temp_file">ไม่สามารถสร้างไฟล์ชั่วคราวได้</string>
     <string name="error_cant_save_image">ไม่สามารถบันทึกรูปภาพได้</string>
     <string name="error_invalid_number">จำนวนไม่ถูกต้อง</string>
 
@@ -69,12 +65,6 @@
     <string name="guest_mode">ดำเนินการต่อโดยไม่ต้องลงชื่อเข้าระบบ</string>
     <string name="sign_in_failed">การลงชื่อเข้าใช้ล้มเหลว</string>
     <string name="get_it">เข้าใจแล้ว ไม่ต้องแสดงอีก</string>
-
-    <!-- Select scene -->
-    <string name="select_scene">เว็บแกลเลอรี่ไหนที่คุณอยากเข้าชม?</string>
-    <string name="select_scene_explain">e-hentai: เขตแดนที่ทุกๆคนสามารถเข้าถึงได้\nexhentai: เขตแดนอันแสนศักศิทธิ์สำหรับคนที่ลงชื่อเข้าใช้ระบบแล้วเท่านั้นที่จะเข้าไปได้</string>
-
-    <!-- Update -->
 
     <!-- Gallery List -->
     <string name="gallery_list_search_bar_hint_exhentai">ค้นหาใน ExHentai</string>
@@ -278,9 +268,8 @@
 
     <string name="settings_eh">EH</string>
     <string name="settings_eh_sign_out">ออกจากระบบ</string>
-    <string name="settings_eh_identity_cookies_signed">คุกกี๊ยืนยันตัวตนสามารถใช้ลงชื่อเข้าสู่ระบบสำหรับบัญชีนี้เท่านั้น&lt;br&gt;&lt;b&gt;เก็บ รักษา ให้ ปลอดภัย&lt;/b&gt;&lt;br&gt;&lt;br&gt;%s</string>
+    <string name="settings_eh_identity_cookies_signed">คุกกี๊ยืนยันตัวตนสามารถใช้ลงชื่อเข้าสู่ระบบสำหรับบัญชีนี้เท่านั้น&lt;br&gt;&lt;b&gt;เก็บ รักษา ให้ ปลอดภัย&lt;/b&gt;</string>
     <string name="settings_eh_identity_cookies_guest">ยังไม่ลงชื่อเข้าสู่ระบบ</string>
-    <string name="settings_eh_identity_cookies_copy">คัดลอก</string>
     <string name="settings_u_config">การตั้งค่า EHentai</string>
     <string name="settings_u_config_summary">การตั้งค่าบนเว็บไซต์ EHentai</string>
     <string name="settings_eh_gallery_site">เว็บไซต์หลักของแกลเลอรี่</string>

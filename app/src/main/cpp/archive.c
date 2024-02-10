@@ -98,6 +98,20 @@ static inline int filename_is_playable_file(const char *name) {
     return false;
 }
 
+static inline const char *archive_entry_pathname2(struct archive_entry *entry) {
+    const char *name = archive_entry_pathname_utf8(entry);
+    return name ? name : archive_entry_pathname(entry);
+}
+
+static inline bool archive_entry_is_file(struct archive_entry *entry) {
+    return archive_entry_filetype(entry) == AE_IFREG;
+}
+
+static inline bool archive_entry_is_playable(struct archive_entry *entry) {
+    return archive_entry_is_file(entry) &&
+           filename_is_playable_file(archive_entry_pathname2(entry));
+}
+
 static inline int compare_entries(const void *a, const void *b) {
     const char *fa = ((entry *) a)->filename;
     const char *fb = ((entry *) b)->filename;
@@ -107,8 +121,8 @@ static inline int compare_entries(const void *a, const void *b) {
 static long archive_map_entries_index(archive_ctx *ctx) {
     long count = 0;
     while (archive_read_next_header(ctx->arc, &ctx->entry) == ARCHIVE_OK) {
-        const char *name = archive_entry_pathname_utf8(ctx->entry);
-        if (filename_is_playable_file(name)) {
+        const char *name = archive_entry_pathname2(ctx->entry);
+        if (archive_entry_is_file(ctx->entry) && filename_is_playable_file(name)) {
             entries[count].filename = strdup(name);
             entries[count].index = count;
             entries[count].size = archive_entry_size(ctx->entry);
@@ -166,7 +180,7 @@ static void mempool_release_pages(void *addr, size_t size) {
 static long archive_list_all_entries(archive_ctx *ctx) {
     long count = 0;
     while (archive_read_next_header(ctx->arc, &ctx->entry) == ARCHIVE_OK)
-        if (filename_is_playable_file(archive_entry_pathname_utf8(ctx->entry)))
+        if (archive_entry_is_playable(ctx->entry))
             count++;
     if (!count)
         LOGE("%s", archive_error_string(ctx->arc));
@@ -214,7 +228,7 @@ static int archive_alloc_ctx(archive_ctx **ctxptr) {
 
 static int archive_skip_to_index(archive_ctx *ctx, int index) {
     while (archive_read_next_header(ctx->arc, &ctx->entry) == ARCHIVE_OK) {
-        if (!filename_is_playable_file(archive_entry_pathname_utf8(ctx->entry)))
+        if (!archive_entry_is_playable(ctx->entry))
             continue;
         if (ctx->next_index++ == index) {
             return ctx->next_index - 1;
@@ -282,7 +296,7 @@ static int archive_get_ctx(archive_ctx **ctxptr, int idx) {
 
 JNIEXPORT jint JNICALL
 Java_com_hippo_ehviewer_jni_ArchiveKt_openArchive(JNIEnv *env, jclass thiz, jint fd,
-                                                                jlong size) {
+                                                  jlong size) {
     EH_UNUSED(env);
     EH_UNUSED(thiz);
     archive_ctx *ctx = NULL;
@@ -362,7 +376,7 @@ Java_com_hippo_ehviewer_jni_ArchiveKt_openArchive(JNIEnv *env, jclass thiz, jint
 
 JNIEXPORT jobject JNICALL
 Java_com_hippo_ehviewer_jni_ArchiveKt_extractToByteBuffer(JNIEnv *env, jclass thiz,
-                                                                        jint index) {
+                                                          jint index) {
     EH_UNUSED(env);
     EH_UNUSED(thiz);
     void *addr = MEMPOOL_ADDR_BY_SORTED_IDX(index);
@@ -418,7 +432,7 @@ Java_com_hippo_ehviewer_jni_ArchiveKt_needPassword(JNIEnv *env, jclass thiz) {
 
 JNIEXPORT jboolean JNICALL
 Java_com_hippo_ehviewer_jni_ArchiveKt_providePassword(JNIEnv *env, jclass thiz,
-                                                                    jstring str) {
+                                                      jstring str) {
     EH_UNUSED(thiz);
     struct archive_entry *entry;
     archive_ctx *ctx;
@@ -429,11 +443,11 @@ Java_com_hippo_ehviewer_jni_ArchiveKt_providePassword(JNIEnv *env, jclass thiz,
         LOGE("Allocate passwd buffer failed");
         return false;
     }
-    strcpy(passwd, (*env)->GetStringUTFChars(env, str, NULL));
+    (*env)->GetStringUTFRegion(env, str, 0, len, passwd);
     archive_alloc_ctx(&ctx);
     void *tmpBuf = alloca(4096);
     while (archive_read_next_header(ctx->arc, &entry) == ARCHIVE_OK) {
-        if (!filename_is_playable_file(archive_entry_pathname_utf8(entry)))
+        if (!archive_entry_is_playable(entry))
             continue;
         if (!archive_entry_is_encrypted(entry))
             continue;
@@ -448,24 +462,17 @@ Java_com_hippo_ehviewer_jni_ArchiveKt_providePassword(JNIEnv *env, jclass thiz,
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_hippo_ehviewer_jni_ArchiveKt_getFilename(JNIEnv *env, jclass thiz,
-                                                                jint index) {
+Java_com_hippo_ehviewer_jni_ArchiveKt_getExtension(JNIEnv *env, jclass thiz,
+                                                   jint index) {
     EH_UNUSED(env);
     EH_UNUSED(thiz);
-    index = entries[index].index;
-    archive_ctx *ctx = NULL;
-    int ret;
-    ret = archive_get_ctx(&ctx, index);
-    if (ret)
-        return NULL;
-    jstring str = (*env)->NewStringUTF(env, archive_entry_pathname_utf8(ctx->entry));
-    ctx->using = 0;
-    return str;
+    const char *ext = strrchr(entries[index].filename, '.') + 1;
+    return (*env)->NewStringUTF(env, ext);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_hippo_ehviewer_jni_ArchiveKt_extractToFd(JNIEnv *env, jclass thiz,
-                                                                jint index, jint fd) {
+                                                  jint index, jint fd) {
     EH_UNUSED(env);
     EH_UNUSED(thiz);
     index = entries[index].index;
@@ -473,16 +480,52 @@ Java_com_hippo_ehviewer_jni_ArchiveKt_extractToFd(JNIEnv *env, jclass thiz,
     int ret;
     ret = archive_get_ctx(&ctx, index);
     if (!ret) {
-        archive_read_data_into_fd(ctx->arc, fd);
+        ret = archive_read_data_into_fd(ctx->arc, fd);
         ctx->using = 0;
     }
+    return ret == ARCHIVE_OK;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hippo_ehviewer_jni_ArchiveKt_releaseByteBuffer(JNIEnv *env, jclass thiz,
-                                                                      jobject buffer) {
+                                                        jobject buffer) {
     EH_UNUSED(thiz);
     void *addr = (*env)->GetDirectBufferAddress(env, buffer);
     size_t size = (*env)->GetDirectBufferCapacity(env, buffer);
     mempool_release_pages(addr, size);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hippo_ehviewer_jni_ArchiveKt_archiveFdBatch(JNIEnv *env, jclass clazz, jintArray fd_batch,
+                                                     jobjectArray names, jint arc_fd, jint size) {
+    struct archive *arc = archive_write_new();
+    struct stat st;
+    char buff[8192];
+    jint fdBatch[size];
+    (*env)->GetIntArrayRegion(env, fd_batch, 0, size, fdBatch);
+    archive_write_set_format_zip(arc);
+    archive_write_zip_set_compression_store(arc);
+    archive_write_open_fd(arc, arc_fd);
+    struct archive_entry *entry = archive_entry_new();
+    for (int i = 0; i < size; i++) {
+        int fd = fdBatch[i];
+        jobject name = (*env)->GetObjectArrayElement(env, names, i);
+        const char *cname = (*env)->GetStringUTFChars(env, name, false);
+        archive_entry_set_pathname(entry, cname);
+        (*env)->ReleaseStringUTFChars(env, name, cname);
+        fstat(fd, &st);
+        archive_entry_copy_stat(entry, &st);
+        archive_entry_set_perm(entry, 0644);
+        archive_write_header(arc, entry);
+        int len = read(fd, buff, sizeof(buff));
+        while (len > 0) {
+            archive_write_data(arc, buff, len);
+            len = read(fd, buff, sizeof(buff));
+        }
+        archive_write_finish_entry(arc);
+        archive_entry_clear(entry);
+    }
+    archive_write_close(arc);
+    archive_write_free(arc);
+    return true;
 }

@@ -197,10 +197,11 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                     value = ifCloudflareIPOverride.rememberedAccessor,
                 )
             }
+            var cloudflareIp by Settings::cloudflareIp.observed
             AnimatedVisibility(visible = ifCloudflareIPOverride.value && enableCronet) {
                 Preference(
                     title = cloudflareIPtitle,
-                    summary = Settings.cloudflareIp,
+                    summary = cloudflareIp,
                 ) {
                     coroutineScope.launch {
                         val newCloudflareIP = dialogState.awaitInputText(
@@ -209,7 +210,7 @@ fun AdvancedScreen(navigator: DestinationsNavigator) {
                             hint = cloudflareIPhint,
                         )
                         if (newCloudflareIP.isNotEmpty()) {
-                            Settings.cloudflareIp = newCloudflareIP
+                            cloudflareIp = newCloudflareIP
                         }
                     }
                 }

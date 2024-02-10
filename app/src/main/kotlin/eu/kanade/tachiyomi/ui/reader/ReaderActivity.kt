@@ -41,6 +41,7 @@ import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.activity.viewModels
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -72,6 +73,8 @@ import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
 import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.databinding.ReaderActivityBinding
+import com.hippo.ehviewer.download.DownloadManager
+import com.hippo.ehviewer.download.downloadDir
 import com.hippo.ehviewer.gallery.ArchivePageLoader
 import com.hippo.ehviewer.gallery.EhPageLoader
 import com.hippo.ehviewer.gallery.PageLoader2
@@ -80,7 +83,6 @@ import com.hippo.ehviewer.ui.EhActivity
 import com.hippo.ehviewer.ui.setMD3Content
 import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.util.AppConfig
-import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.awaitActivityResult
 import com.hippo.ehviewer.util.getParcelableCompat
@@ -91,9 +93,9 @@ import com.hippo.ehviewer.util.isAtLeastP
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.lazyMut
 import com.hippo.ehviewer.util.requestPermission
-import com.hippo.ehviewer.util.sendTo
 import com.hippo.ehviewer.util.setValue
 import com.hippo.unifile.asUniFile
+import com.hippo.unifile.displayPath
 import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.setting.OrientationType
@@ -103,8 +105,6 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReadingModeType
 import eu.kanade.tachiyomi.ui.reader.viewer.BaseViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
 import eu.kanade.tachiyomi.util.lang.launchIO
-import eu.kanade.tachiyomi.util.lang.launchUI
-import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import eu.kanade.tachiyomi.util.system.isNightMode
 import java.io.File
@@ -117,8 +117,8 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import moe.tarsin.coroutines.runSuspendCatching
-import splitties.init.appCtx
 import splitties.systemservices.clipboardManager
 
 class GalleryModel : ViewModel() {
@@ -133,10 +133,9 @@ class GalleryModel : ViewModel() {
 class ReaderActivity : EhActivity() {
     lateinit var binding: ReaderActivityBinding
     private var mAction: String? = null
-    private var mFilename: String? = null
     private var mUri: Uri? = null
     private var mGalleryInfo: BaseGalleryInfo? = null
-    private var mPage: Int = 0
+    private var mPage: Int = -1
     private val vm: GalleryModel by viewModels()
     private val dialogState = DialogState()
 
@@ -145,7 +144,11 @@ class ReaderActivity : EhActivity() {
      */
     var menuVisible by mutableStateOf(false)
     private var mGalleryProvider by lazyMut { vm::galleryProvider }
-    private var mCurrentIndex: Int = 0
+    private var mCurrentIndex: Int
+        get() = mGalleryProvider!!.startPage
+        set(value) {
+            mGalleryProvider!!.startPage = value
+        }
 
     private val galleryDetailUrl: String?
         get() {
@@ -160,54 +163,56 @@ class ReaderActivity : EhActivity() {
             return EhUrl.getGalleryDetailUrl(gid, token, 0, false)
         }
 
-    private fun buildProvider(replace: Boolean = false) {
-        if (mGalleryProvider != null) {
-            if (replace) mGalleryProvider!!.stop() else return
+    private suspend fun buildProvider(replace: Boolean = false): PageLoader2? {
+        mGalleryProvider?.let {
+            if (replace) it.stop() else return it
         }
 
-        if (ACTION_EH == mAction) {
-            mGalleryInfo?.let { mGalleryProvider = EhPageLoader(it) }
-        } else if (Intent.ACTION_VIEW == mAction) {
-            if (mUri != null) {
-                try {
-                    grantUriPermission(
-                        BuildConfig.APPLICATION_ID,
-                        mUri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
-                } catch (e: Exception) {
-                    Toast.makeText(this, R.string.error_reading_failed, Toast.LENGTH_SHORT).show()
-                }
-
-                mGalleryProvider = ArchivePageLoader(
-                    appCtx,
-                    mUri!!,
-                ) { invalidator ->
-                    runCatching {
-                        dialogState.awaitInputText(
-                            title = getString(R.string.archive_need_passwd),
-                            hint = getString(R.string.archive_passwd),
-                        ) {
-                            if (it.isBlank()) {
-                                getString(R.string.passwd_cannot_be_empty)
-                            } else if (invalidator(it)) {
-                                null
-                            } else {
-                                getString(R.string.passwd_wrong)
-                            }
-                        }
-                    }.onFailure {
-                        finish()
-                    }.getOrThrow()
+        val provider = when (mAction) {
+            ACTION_EH -> {
+                mGalleryInfo?.let {
+                    DownloadManager.getDownloadInfo(it.gid)?.downloadDir
+                        ?.findFile("${it.gid}.cbz")
+                        ?.let { file -> ArchivePageLoader(file, it.gid, mPage) }
+                        ?: EhPageLoader(it, mPage)
                 }
             }
+
+            Intent.ACTION_VIEW -> {
+                mUri?.run {
+                    ArchivePageLoader(asUniFile()) { invalidator ->
+                        runCatching {
+                            dialogState.awaitInputText(
+                                title = getString(R.string.archive_need_passwd),
+                                hint = getString(R.string.archive_passwd),
+                            ) {
+                                if (it.isBlank()) {
+                                    getString(R.string.passwd_cannot_be_empty)
+                                } else if (invalidator(it)) {
+                                    null
+                                } else {
+                                    getString(R.string.passwd_wrong)
+                                }
+                            }
+                        }.onFailure {
+                            finish()
+                        }.getOrThrow()
+                    }
+                }
+            }
+
+            else -> null
         }
+        if (provider == null) {
+            makeToast(R.string.error_reading_failed)
+            finish()
+        }
+        return provider
     }
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         mAction = intent.action
-        mFilename = intent.getStringExtra(KEY_FILENAME)
         mUri = intent.data
         mGalleryInfo = intent.getParcelableExtraCompat(KEY_GALLERY_INFO)
         mPage = intent.getIntExtra(KEY_PAGE, -1)
@@ -219,19 +224,17 @@ class ReaderActivity : EhActivity() {
 
     private fun onRestore(savedInstanceState: Bundle) {
         mAction = savedInstanceState.getString(KEY_ACTION)
-        mFilename = savedInstanceState.getString(KEY_FILENAME)
         mUri = savedInstanceState.getParcelableCompat(KEY_URI)
         mGalleryInfo = savedInstanceState.getParcelableCompat(KEY_GALLERY_INFO)
         mPage = savedInstanceState.getInt(KEY_PAGE, -1)
-        mCurrentIndex = savedInstanceState.getInt(KEY_CURRENT_INDEX)
     }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         handleIntent(intent)
-        buildProvider(true)
-        mGalleryProvider?.let {
-            lifecycleScope.launchIO {
+        lifecycleScope.launchIO {
+            buildProvider(true)?.let {
+                mGalleryProvider = it
                 it.start()
                 if (it.awaitReady()) {
                     withUIContext {
@@ -239,6 +242,9 @@ class ReaderActivity : EhActivity() {
                         viewer?.setGalleryProvider(it)
                         moveToPageIndex(0)
                     }
+                } else {
+                    makeToast(R.string.error_reading_failed)
+                    finish()
                 }
             }
         }
@@ -247,13 +253,11 @@ class ReaderActivity : EhActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(KEY_ACTION, mAction)
-        outState.putString(KEY_FILENAME, mFilename)
         outState.putParcelable(KEY_URI, mUri)
         if (mGalleryInfo != null) {
             outState.putParcelable(KEY_GALLERY_INFO, mGalleryInfo)
         }
         outState.putInt(KEY_PAGE, mPage)
-        outState.putInt(KEY_CURRENT_INDEX, mCurrentIndex)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -270,7 +274,6 @@ class ReaderActivity : EhActivity() {
         } else {
             onRestore(savedInstanceState)
         }
-        buildProvider()
         binding = ReaderActivityBinding.inflate(layoutInflater)
         binding.dialogStub.setMD3Content {
             val brightness by Settings.customBrightness.collectAsState()
@@ -317,14 +320,16 @@ class ReaderActivity : EhActivity() {
             )
         }
         setContentView(binding.root)
-        mGalleryProvider.let {
-            if (it == null) {
-                finish()
-                return
-            }
-            lifecycleScope.launchIO {
+        lifecycleScope.launchIO {
+            buildProvider()?.let {
+                mGalleryProvider = it
                 it.start()
-                if (it.awaitReady()) withUIContext { setGallery() }
+                if (it.awaitReady()) {
+                    withUIContext { setGallery() }
+                } else {
+                    makeToast(R.string.error_reading_failed)
+                    finish()
+                }
             }
         }
 
@@ -346,10 +351,6 @@ class ReaderActivity : EhActivity() {
     private fun setGallery() {
         if (mGalleryProvider?.isReady != true) return
 
-        // Get start page
-        if (mCurrentIndex == 0) {
-            mCurrentIndex = if (mPage >= 0) mPage else mGalleryProvider!!.startPage
-        }
         totalPage = mGalleryProvider!!.size
         viewer?.destroy()
         viewer = ReadingModeType.toViewer(ReaderPreferences.defaultReadingMode().get(), this)
@@ -371,207 +372,120 @@ class ReaderActivity : EhActivity() {
         readerSettingSheetDialog = null
     }
 
-    fun shareImage(page: Int) {
-        if (null == mGalleryProvider) {
-            return
-        }
+    private suspend fun makeToast(text: String) = withUIContext {
+        Toast.makeText(this@ReaderActivity, text, Toast.LENGTH_SHORT).show()
+    }
 
-        val dir = AppConfig.externalTempDir
-        if (null == dir) {
-            Toast.makeText(this, R.string.error_cant_create_temp_file, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val file = mGalleryProvider!!.save(
-            page,
-            dir.asUniFile(),
-            mGalleryProvider!!.getImageFilenameWithExtension(page),
-        )
-        if (file == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val filename = file.name
-        if (filename == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
+    private suspend fun makeToast(@StringRes resId: Int) = makeToast(getString(resId))
 
-        var mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-            MimeTypeMap.getFileExtensionFromUrl(filename),
-        )
-        if (mimeType.isNullOrEmpty()) {
-            mimeType = "image/jpeg"
-        }
-
-        val uri = FileProvider.getUriForFile(
-            this,
-            BuildConfig.APPLICATION_ID + ".fileprovider",
-            File(dir, filename),
-        )
-
-        val intent = Intent()
-        intent.action = Intent.ACTION_SEND
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        intent.putExtra(Intent.EXTRA_STREAM, uri)
-        if (mGalleryInfo != null) {
-            intent.putExtra(
-                Intent.EXTRA_TEXT,
-                EhUrl.getGalleryDetailUrl(mGalleryInfo!!.gid, mGalleryInfo!!.token),
-            )
-        }
-        intent.setDataAndType(uri, mimeType)
-
-        try {
-            startActivity(Intent.createChooser(intent, getString(R.string.share_image)))
-        } catch (e: Throwable) {
-            ExceptionUtils.throwIfFatal(e)
-            Toast.makeText(this, R.string.error_cant_find_activity, Toast.LENGTH_SHORT).show()
+    private fun provideImage(index: Int): Uri? {
+        return AppConfig.externalTempDir?.let { dir ->
+            mGalleryProvider?.saveToDir(index, dir.asUniFile())?.name?.let {
+                FileProvider.getUriForFile(
+                    this,
+                    BuildConfig.APPLICATION_ID + ".fileprovider",
+                    File(dir, it),
+                )
+            }
         }
     }
 
-    fun copyImage(page: Int) {
-        if (null == mGalleryProvider) {
-            return
-        }
+    fun shareImage(index: Int) {
+        lifecycleScope.launchIO {
+            val uri = provideImage(index) ?: return@launchIO makeToast(R.string.error_cant_save_image)
+            val intent = Intent()
+            intent.action = Intent.ACTION_SEND
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.putExtra(Intent.EXTRA_STREAM, uri)
+            mGalleryInfo?.run {
+                intent.putExtra(Intent.EXTRA_TEXT, EhUrl.getGalleryDetailUrl(gid, token))
+            }
 
-        val dir = AppConfig.externalCopyTempDir
-        if (null == dir) {
-            Toast.makeText(this, R.string.error_cant_create_temp_file, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val file = mGalleryProvider!!.save(
-            page,
-            dir.asUniFile(),
-            mGalleryProvider!!.getImageFilenameWithExtension(page),
-        )
-        if (file == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val filename = file.name
-        if (filename == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
+            val extension = FileUtils.getExtensionFromFilename(uri.path)
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "image/jpeg"
+            intent.setDataAndType(uri, mimeType)
 
-        val uri = FileProvider.getUriForFile(
-            this,
-            BuildConfig.APPLICATION_ID + ".fileprovider",
-            File(dir, filename),
-        )
-
-        val clipData = ClipData.newUri(contentResolver, "ehviewer", uri)
-        clipboardManager.setPrimaryClip(clipData)
-        Toast.makeText(this, getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
+            try {
+                startActivity(Intent.createChooser(intent, getString(R.string.share_image)))
+            } catch (e: Throwable) {
+                makeToast(R.string.error_cant_find_activity)
+            }
+        }
     }
 
-    fun saveImage(page: Int) {
+    fun copyImage(index: Int) {
+        lifecycleScope.launchIO {
+            val uri = provideImage(index) ?: return@launchIO makeToast(R.string.error_cant_save_image)
+            val clipData = ClipData.newUri(contentResolver, "ehviewer", uri)
+            clipboardManager.setPrimaryClip(clipData)
+            makeToast(R.string.copied_to_clipboard)
+        }
+    }
+
+    fun saveImage(index: Int) {
         mGalleryProvider ?: return
 
-        lifecycleScope.launchUI {
+        lifecycleScope.launchIO {
             val granted = isAtLeastQ || requestPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             if (granted) {
-                val filename = mGalleryProvider!!.getImageFilenameWithExtension(page)
-                var mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-                    MimeTypeMap.getFileExtensionFromUrl(filename),
-                )
-                if (mimeType.isNullOrEmpty()) {
-                    mimeType = "image/jpeg"
-                }
+                val filename = mGalleryProvider!!.getImageFilename(index)
+                val extension = FileUtils.getExtensionFromFilename(filename)
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "image/jpeg"
 
                 val realPath: String
                 val resolver = contentResolver
                 val values = ContentValues()
                 values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                values.put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis())
+                values.put(MediaStore.Images.Media.DATE_ADDED, Clock.System.now().toEpochMilliseconds())
                 values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                 if (isAtLeastQ) {
-                    values.put(
-                        MediaStore.MediaColumns.RELATIVE_PATH,
-                        Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME,
-                    )
-                    values.put(MediaStore.MediaColumns.IS_PENDING, 1)
                     realPath = Environment.DIRECTORY_PICTURES + File.separator + AppConfig.APP_DIRNAME
+                    values.put(MediaStore.MediaColumns.RELATIVE_PATH, realPath)
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 1)
                 } else {
-                    val path = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                        AppConfig.APP_DIRNAME,
-                    )
+                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                    val path = File(dir, AppConfig.APP_DIRNAME)
                     realPath = path.toString()
                     if (!FileUtils.ensureDirectory(path)) {
-                        Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-                        return@launchUI
+                        return@launchIO makeToast(R.string.error_cant_save_image)
                     }
-                    values.put(MediaStore.MediaColumns.DATA, path.toString() + File.separator + filename)
+                    values.put(MediaStore.MediaColumns.DATA, realPath + File.separator + filename)
                 }
                 val imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                if (imageUri == null) {
-                    Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-                    return@launchUI
-                }
-                if (!mGalleryProvider!!.save(page, imageUri.asUniFile())) {
+                    ?: return@launchIO makeToast(R.string.error_cant_save_image)
+                if (!mGalleryProvider!!.save(index, imageUri.asUniFile())) {
                     try {
                         resolver.delete(imageUri, null, null)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-
-                    Toast.makeText(this@ReaderActivity, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-                    return@launchUI
+                    return@launchIO makeToast(R.string.error_cant_save_image)
                 } else if (isAtLeastQ) {
                     val contentValues = ContentValues()
                     contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
                     resolver.update(imageUri, contentValues, null, null)
                 }
 
-                Toast.makeText(
-                    this@ReaderActivity,
-                    getString(R.string.image_saved, realPath + File.separator + filename),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                makeToast(getString(R.string.image_saved, realPath + File.separator + filename))
             } else {
-                Toast.makeText(this@ReaderActivity, R.string.permission_denied, Toast.LENGTH_SHORT).show()
+                makeToast(R.string.permission_denied)
             }
         }
     }
 
-    fun saveImageTo(page: Int) {
-        if (null == mGalleryProvider) {
-            return
-        }
-        val dir = AppConfig.externalTempDir
-        if (null == dir) {
-            Toast.makeText(this, R.string.error_cant_create_temp_file, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val file = mGalleryProvider!!.save(
-            page,
-            dir.asUniFile(),
-            mGalleryProvider!!.getImageFilenameWithExtension(page),
-        )
-        if (file == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val filename = file.name
-        if (filename == null) {
-            Toast.makeText(this, R.string.error_cant_save_image, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val activity = this
-        lifecycleScope.launchUI {
+    fun saveImageTo(index: Int) {
+        lifecycleScope.launchIO {
+            val filename = mGalleryProvider?.getImageFilename(index) ?: return@launchIO
+            val extension = FileUtils.getExtensionFromFilename(filename)
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "image/jpeg"
             runSuspendCatching {
-                val uri = awaitActivityResult(CreateDocument("todo/todo"), filename)
-                if (uri != null) {
-                    withIOContext {
-                        val f = requireNotNull(AppConfig.externalTempDir).asUniFile() / filename
-                        f sendTo uri.asUniFile()
-                        f.delete()
-                    }
-                    Toast.makeText(activity, getString(R.string.image_saved, uri.path), Toast.LENGTH_SHORT).show()
+                awaitActivityResult(CreateDocument(mimeType), filename)?.let {
+                    mGalleryProvider!!.save(index, it.asUniFile())
+                    makeToast(getString(R.string.image_saved, it.displayPath))
                 }
             }.onFailure {
-                Toast.makeText(activity, R.string.error_cant_find_activity, Toast.LENGTH_SHORT).show()
+                it.printStackTrace()
+                makeToast(R.string.error_cant_find_activity)
             }
         }
     }
@@ -588,11 +502,9 @@ class ReaderActivity : EhActivity() {
     companion object {
         const val ACTION_EH = "eh"
         const val KEY_ACTION = "action"
-        const val KEY_FILENAME = "filename"
         const val KEY_URI = "uri"
         const val KEY_GALLERY_INFO = "gallery_info"
         const val KEY_PAGE = "page"
-        const val KEY_CURRENT_INDEX = "current_index"
     }
 
     // Tachiyomi funcs
@@ -722,13 +634,11 @@ class ReaderActivity : EhActivity() {
      * Called from the viewer whenever a [page] is marked as active. It updates the values of the
      * bottom menu and delegates the change to the presenter.
      */
-    @SuppressLint("SetTextI18n")
     fun onPageSelected(page: ReaderPage) {
         // Set bottom page number
         currentPage = page.number
 
         mCurrentIndex = page.index
-        mGalleryProvider?.putStartPage(mCurrentIndex)
     }
 
     /**

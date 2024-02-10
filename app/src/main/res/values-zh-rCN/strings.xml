@@ -27,12 +27,9 @@
     <string name="sign_in">登录</string>
     <string name="register">注册</string>
     <string name="sign_in_via_webview">通过网页登录</string>
-    <string name="sign_in_via_cookies">通过 Cookie 登录</string>
     <string name="sign_in_first">请先登录</string>
-    <string name="cookie_explain">Cookie 是存储在浏览器里的一小块数据。如果您不清楚 Cookie 什么或者怎么获取 Cookie，最好搜索一下。\n\n请输入特定的 Cookie 来登录。</string>
     <string name="text_is_empty">文本为空</string>
     <string name="waring">警告</string>
-    <string name="wrong_cookie_warning">看起来您输入的 Cookie 是错误的，最好检查一下。</string>
     <string name="invalid_download_location">似乎下载路径不可用。请到重新设置下载路径。</string>
     <string name="clipboard_gallery_url_snack_message">剪切板里有画廊链接</string>
     <string name="clipboard_gallery_url_snack_action">查看</string>
@@ -51,7 +48,6 @@
     <string name="error_509">509</string>
     <string name="error_invalid_url">无效链接</string>
     <string name="error_get_ptoken_error">获取 pToken 错误</string>
-    <string name="error_cant_create_temp_file">无法创建临时文件</string>
     <string name="error_cant_save_image">无法保存图片</string>
     <string name="error_invalid_number">非法数字</string>
     <string name="app_waring">本应用中内容来自互联网，部分内容可能对您的生理及心理造成难以恢复的伤害。本应用作者不会对由本应用造成的任何后果负责。未成年人应在监护人指导下使用本应用。请遵守所在地的法律法规。</string>
@@ -62,10 +58,6 @@
     <string name="sign_in_failed">登录失败</string>
     <string name="sign_in_failed_tip">若持续出错，请尝试“通过网页登录”或“通过 Cookie 登录”。</string>
     <string name="get_it">知道了</string>
-    <!-- Select scene -->
-    <string name="select_scene">你想选择哪个画廊站点？</string>
-    <string name="select_scene_explain">e-hentai：对任何人开放\nexhentai：仅对登录用户开放</string>
-    <!-- Update -->
     <!-- Gallery List -->
     <string name="gallery_list_search_bar_hint_exhentai">搜索 ExHentai</string>
     <string name="gallery_list_search_bar_hint_e_hentai">搜索 E-Hentai</string>
@@ -292,9 +284,9 @@
     <!-- Settings -->
     <string name="settings_eh">EH</string>
     <string name="settings_eh_sign_out">退出登录</string>
-    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用于登录该账号。&lt;br&gt;&lt;b&gt;注意数据安全&lt;/b&gt;&lt;br&gt;&lt;br&gt;%s</string>
+    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用于登录该账号。&lt;br&gt;&lt;b&gt;注意数据安全&lt;/b&gt;</string>
     <string name="settings_eh_identity_cookies_guest">游客模式</string>
-    <string name="settings_eh_identity_cookies_copy">复制 Cookies</string>
+    <string name="settings_eh_clear_igneous">清除 igneous</string>
     <string name="settings_u_config">EHentai 设置</string>
     <string name="settings_u_config_summary">EHentai 网站上的设置</string>
     <string name="settings_my_tags">我的标签</string>
@@ -364,7 +356,7 @@
     <string name="settings_advanced_app_language_title">App 界面语言</string>
     <string name="settings_advanced_enable_quic">QUIC 支持</string>
     <string name="settings_advanced_enable_quic_summary">启用 QUIC 协议支持（需要重启应用）</string>
-    <string name="settings_advanced_http_engine">Http 引擎</string>
+    <string name="settings_advanced_http_engine">Http 引擎（重启生效)</string>
     <string name="settings_advanced_touch_slop">[实验性] 触摸溢出系数</string>
     <string name="settings_advanced_touch_slop_summary">增大此项将降低滑动手势敏感度</string>
     <string name="settings_advanced_export_data">导出数据</string>
@@ -448,8 +440,8 @@
     <string name="current_funds">资金：%1$s GP，%2$d Credits</string>
     <string name="insufficient_funds">余额不足</string>
     <string name="image_limits">图片配额</string>
-    <string name="image_limits_summary">%1$d / %2$d（点击刷新）</string>
-    <string name="current_limits">已用：%1$s\n重置花费：%2$d GP</string>
+    <string name="image_limits_summary">已用：%1$d / %2$d</string>
+    <string name="current_limits">%1$s\n重置花费：%2$d GP</string>
     <string name="reset_limits_succeed">成功重置图片配额</string>
     <string name="reset">重置</string>
     <string name="settings_privacy">隐私</string>
@@ -479,8 +471,6 @@
     <string name="tag_vote_down">不，这不是</string>
     <string name="tag_vote_up">是的，这很正确</string>
     <string name="tag_vote_successfully">投票成功</string>
-    <string name="from_clipboard">从剪贴板导入</string>
-    <string name="from_clipboard_error">未在剪贴板中发现 Cookies。</string>
     <string name="delete_search_history">从搜索记录中删除“%s”？</string>
     <string name="action_add_tag">添加标签</string>
     <string name="action_add_tag_tip">添加新标签，用逗号「，」分割</string>
@@ -491,8 +481,6 @@
     <string name="settings_eh_request_news">定时请求新闻页面</string>
     <string name="settings_eh_hide_hv_events">隐藏 HV 事件通知</string>
     <string name="copy_trans">复制翻译</string>
-    <string name="reset_download_location">恢复默认路径</string>
-    <string name="pick_new_download_location">选择新路径</string>
     <string name="dont_show_again">不再显示</string>
     <string name="open_settings">打开设置</string>
     <string name="app_link_not_verified_message">对于 Android 12 及更新的版本，您需要手动添加链接到已验证链接才能在 EhViewer 中打开 E-Hentai 链接。</string>
@@ -522,6 +510,10 @@
     <string name="new_version_available">有新版本！</string>
     <string name="already_latest_version">已是最新版本</string>
     <string name="permission_denied">权限被拒</string>
+    <string name="download_gallery_first">请先下载画廊！</string>
+    <string name="export_as_archive">导出为归档文件</string>
+    <string name="export_as_archive_success">导出成功</string>
+    <string name="export_as_archive_failed">导出失败</string>
     <!-- Tachiyomi Reader Start-->
     <string name="action_settings">设置</string>
     <string name="action_retry">重试</string>

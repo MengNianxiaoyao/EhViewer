@@ -41,12 +41,9 @@
     <string name="sign_in">Sign in</string>
     <string name="register">Register</string>
     <string name="sign_in_via_webview">Sign in via WebView</string>
-    <string name="sign_in_via_cookies">Sign in via cookies</string>
     <string name="sign_in_first">Please sign in first</string>
-    <string name="cookie_explain">A cookie is a small piece of data stored in web browser. Google it if you don\'t know what it is or how to get it.\n\nPlease enter special cookies to sign in.</string>
     <string name="text_is_empty">Text is empty</string>
     <string name="waring">Warning</string>
-    <string name="wrong_cookie_warning">It seems that the cookies you entered are wrong. You\'d better check them.</string>
     <string name="invalid_download_location">It seems download location is not available. Please set it in Settings.</string>
     <string name="clipboard_gallery_url_snack_message">There is a gallery URL in the clipboard</string>
     <string name="clipboard_gallery_url_snack_action">View</string>
@@ -89,7 +86,6 @@
     <string name="error_509">509</string>
     <string name="error_invalid_url">Invalid URL</string>
     <string name="error_get_ptoken_error">Get pToken error</string>
-    <string name="error_cant_create_temp_file">Couldn\'t create temp file</string>
     <string name="error_cant_save_image">Can\'t save image</string>
     <string name="error_invalid_number">Invalid number</string>
     <string name="app_waring">The content of this application is from the Internet. Some of it may do physical or mental harm to you. You have learnt the risks above and would like to undertake them. By continuing to use it, you agree to the above terms.</string>
@@ -100,10 +96,6 @@
     <string name="sign_in_failed">Sign in failed</string>
     <string name="sign_in_failed_tip">If this issue continues, try \"Sign in via WebView\" or \"Sign in via cookies\".</string>
     <string name="get_it">Got it</string>
-    <!-- Select scene -->
-    <string name="select_scene">Which gallery site do you want to visit?</string>
-    <string name="select_scene_explain">e-hentai: available for anyone\nexhentai: available for who has signed in</string>
-    <!-- Update -->
     <!-- Gallery List -->
     <string name="gallery_list_search_bar_hint_exhentai">Search ExHentai</string>
     <string name="gallery_list_search_bar_hint_e_hentai">Search E-Hentai</string>
@@ -333,9 +325,9 @@
     <string name="image_saved">Image saved to %s</string>
     <string name="settings_eh">EH</string>
     <string name="settings_eh_sign_out">Sign out</string>
-    <string name="settings_eh_identity_cookies_signed">Identity cookies can be used to sign in to this account.&lt;br&gt;&lt;b&gt;KEEP IT SAFE&lt;/b&gt;&lt;br&gt;&lt;br&gt;%s</string>
+    <string name="settings_eh_identity_cookies_signed">Identity cookies can be used to sign in to this account.&lt;br&gt;&lt;b&gt;KEEP IT SAFE&lt;/b&gt;</string>
     <string name="settings_eh_identity_cookies_guest">Guest mode</string>
-    <string name="settings_eh_identity_cookies_copy">Copy Cookies</string>
+    <string name="settings_eh_clear_igneous">Clear igneous</string>
     <string name="settings_u_config">EHentai settings</string>
     <string name="settings_u_config_summary">Settings on EHentai website</string>
     <string name="settings_my_tags">My tags</string>
@@ -408,7 +400,7 @@
     <string name="settings_advanced_app_language_title">App language</string>
     <string name="settings_advanced_enable_quic">QUIC support</string>
     <string name="settings_advanced_enable_quic_summary">Enable QUIC protocol support (App restart required)</string>
-    <string name="settings_advanced_http_engine">Http Engine</string>
+    <string name="settings_advanced_http_engine">Http Engine (Restart required)</string>
     <string name="settings_advanced_touch_slop">[Experimental] Touch slop factor</string>
     <string name="settings_advanced_touch_slop_summary">Increasing this will reduce swipe gesture sensitivity</string>
     <string name="settings_advanced_export_data">Export data</string>
@@ -513,8 +505,8 @@
     <string name="current_funds">Funds: %1$s GP, %2$d Credits</string>
     <string name="insufficient_funds">Insufficient Funds</string>
     <string name="image_limits">Image Limits</string>
-    <string name="image_limits_summary">%1$d / %2$d (Click to refresh)</string>
-    <string name="current_limits">Used: %1$s\nReset Cost: %2$d GP</string>
+    <string name="image_limits_summary">Used: %1$d / %2$d</string>
+    <string name="current_limits">%1$s\nReset Cost: %2$d GP</string>
     <string name="reset_limits_succeed">Image limit was successfully reset</string>
     <string name="reset">Reset</string>
     <string name="settings_privacy">Privacy</string>
@@ -541,8 +533,6 @@
     <string name="tag_vote_down">Vote down</string>
     <string name="tag_vote_up">Vote up</string>
     <string name="tag_vote_successfully">Vote successfully</string>
-    <string name="from_clipboard">From clipboard</string>
-    <string name="from_clipboard_error">No cookies found in clipboard.</string>
     <string name="delete_search_history">Delete \"%s\" from search history?</string>
     <string name="action_add_tag">Add tag</string>
     <string name="action_add_tag_tip">Enter new tags, separated with comma</string>
@@ -553,8 +543,6 @@
     <string name="settings_eh_request_news">Timed request news page</string>
     <string name="settings_eh_hide_hv_events">Hide HV event Notifications</string>
     <string name="copy_trans">Copy translation</string>
-    <string name="reset_download_location">Reset to default</string>
-    <string name="pick_new_download_location">Pick a new location</string>
     <string name="dont_show_again">Don\'t show again</string>
     <string name="open_settings">Open settings</string>
     <string name="app_link_not_verified_message">For Android 12 and newer, you need to manually add link to verified links in order to open E-Hentai links in EhViewer.</string>
@@ -586,6 +574,10 @@
     <string name="new_version_available">New version available!</string>
     <string name="already_latest_version">Already the latest version</string>
     <string name="permission_denied">Permission denied</string>
+    <string name="download_gallery_first">Please download the gallery first!</string>
+    <string name="export_as_archive">Export as archive</string>
+    <string name="export_as_archive_success">Export succeed</string>
+    <string name="export_as_archive_failed">Export failed</string>
     <!-- Tachiyomi Reader Start-->
     <string name="pref_crop_borders">Crop borders</string>
     <string name="action_settings">Settings</string>

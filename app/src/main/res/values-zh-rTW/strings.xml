@@ -27,12 +27,9 @@
     <string name="sign_in">登入</string>
     <string name="register">註冊</string>
     <string name="sign_in_via_webview">透過網頁登入</string>
-    <string name="sign_in_via_cookies">透過 Cookie 登入</string>
     <string name="sign_in_first">請先登入</string>
-    <string name="cookie_explain">Cookie 是儲存在瀏覽器裡的一小塊資料。如果您不清楚 Cookie 是什麼或者如何取得 Cookie，最好去查一下。\n\n請輸入特定的 Cookie 來登入。</string>
     <string name="text_is_empty">文字是空的</string>
     <string name="waring">警告</string>
-    <string name="wrong_cookie_warning">看來您輸入的 Cookie 是錯誤的，最好再檢查一下。</string>
     <string name="invalid_download_location">看來下載路徑似乎沒辦法使用。請至設定重新設定下載路徑。</string>
     <string name="clipboard_gallery_url_snack_message">剪下板裡有圖庫連結</string>
     <string name="clipboard_gallery_url_snack_action">檢視</string>
@@ -51,7 +48,6 @@
     <string name="error_509">509</string>
     <string name="error_invalid_url">不正確的連結</string>
     <string name="error_get_ptoken_error">取得 pToken 時發生錯誤</string>
-    <string name="error_cant_create_temp_file">無法建立暫存檔案</string>
     <string name="error_cant_save_image">無法儲存圖片</string>
     <string name="error_invalid_number">無效的數字</string>
     <string name="app_waring">本應用程式中內容來自網際網路，部分內容可能對您的生理及心理造成難以恢復的傷害。本應用程式的作者不會對由其所造成的任何影響負責。\n\n未成年人應在監護人指導下使用本應用程式。\n\n繼續使用即代表您同意上述條款。</string>
@@ -62,10 +58,6 @@
     <string name="sign_in_failed">登入失敗</string>
     <string name="sign_in_failed_tip">若持續出錯，請嘗試“通過網頁登入”或“通過 Cookie 登入”。</string>
     <string name="get_it">知道了</string>
-    <!-- Select scene -->
-    <string name="select_scene">你想選擇哪個圖庫站台？</string>
-    <string name="select_scene_explain">e-hentai：對任何人開放\nexhentai：僅對登入使用者開放</string>
-    <!-- Update -->
     <!-- Gallery List -->
     <string name="gallery_list_search_bar_hint_exhentai">在 ExHentai 搜尋</string>
     <string name="gallery_list_search_bar_hint_e_hentai">在 E-Hentai 搜尋</string>
@@ -292,9 +284,9 @@
     <!-- Settings -->
     <string name="settings_eh">EH</string>
     <string name="settings_eh_sign_out">登出</string>
-    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用於登入該帳號。&lt;br&gt;&lt;b&gt;請注意資料安全&lt;/b&gt;&lt;br&gt;&lt;br&gt;%s</string>
+    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用於登入該帳號。&lt;br&gt;&lt;b&gt;請注意資料安全&lt;/b&gt;</string>
     <string name="settings_eh_identity_cookies_guest">訪客模式</string>
-    <string name="settings_eh_identity_cookies_copy">複製 Cookies</string>
+    <string name="settings_eh_clear_igneous">清除 igneous</string>
     <string name="settings_u_config">EHentai 設定</string>
     <string name="settings_u_config_summary">EHentai 網站上的設定</string>
     <string name="settings_my_tags">我的標籤</string>
@@ -441,8 +433,8 @@
     <string name="current_funds">資金：%1$s GP，%2$d Credits</string>
     <string name="insufficient_funds">餘額不足</string>
     <string name="image_limits">圖片配額</string>
-    <string name="image_limits_summary">%1$d / %2$d（點擊以重新整理）</string>
-    <string name="current_limits">已用：%1$s\n重置花費：%2$d GP</string>
+    <string name="image_limits_summary">已用：%1$d / %2$d</string>
+    <string name="current_limits">%1$s\n重置花費：%2$d GP</string>
     <string name="reset_limits_succeed">成功重置圖片配額</string>
     <string name="reset">重置</string>
     <string name="settings_privacy">隱私</string>
@@ -472,8 +464,6 @@
     <string name="tag_vote_down">不，這不是</string>
     <string name="tag_vote_up">是的，這很正確</string>
     <string name="tag_vote_successfully">投票成功</string>
-    <string name="from_clipboard">從剪貼簿匯入</string>
-    <string name="from_clipboard_error">未在剪貼簿中發現 Cookies。</string>
     <string name="delete_search_history">從搜尋記錄中刪除“%s”？</string>
     <string name="action_add_tag">增加標籤</string>
     <string name="action_add_tag_tip">增加新標籤，用逗號「，」分割</string>
@@ -484,8 +474,6 @@
     <string name="settings_eh_request_news">啟動時請求新聞頁面</string>
     <string name="settings_eh_hide_hv_events">隱藏 HV 事件通知</string>
     <string name="copy_trans">複製翻譯</string>
-    <string name="reset_download_location">恢復預設路徑</string>
-    <string name="pick_new_download_location">選擇新路徑</string>
     <string name="dont_show_again">不再顯示</string>
     <string name="open_settings">打開設定</string>
     <string name="app_link_not_verified_message">對於 Android 12 及更新的版本，您需要手動增加連結到已驗證連結才能在 EhViewer 中打開 E-Hentai 連結。</string>

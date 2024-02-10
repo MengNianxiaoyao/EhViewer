@@ -30,7 +30,7 @@ jobs:
           workspaces: "./app/src/main/rust"
 
       - name: CMake Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             app/.cxx
@@ -39,7 +39,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cmake-
 
       - name: Gradle Build
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/gradle-build-action@v3
         with:
           arguments: assembleRelease
 

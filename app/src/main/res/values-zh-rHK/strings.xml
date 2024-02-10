@@ -32,13 +32,10 @@
     <string name="sign_in">登錄</string>
     <string name="register">註冊</string>
     <string name="sign_in_via_webview">通過網頁登錄</string>
-    <string name="sign_in_via_cookies">通過 Cookie 登錄</string>
     <string name="sign_in_first">請先登錄</string>
 
-    <string name="cookie_explain">Cookie 是存儲在瀏覽器裏的一小塊數據。如果您不清楚 Cookie 什麼或者怎麼獲取 Cookie，最好搜索一下。\n\n請輸入特定的 Cookie 來登錄。</string>
     <string name="text_is_empty">文本為空</string>
     <string name="waring">警告</string>
-    <string name="wrong_cookie_warning">看起來您輸入的 Cookie 是錯誤的，最好檢查一下。</string>
 
     <string name="invalid_download_location">似乎下載路徑不可用。請到重新設置下載路徑。</string>
 
@@ -60,7 +57,6 @@
     <string name="error_509">509</string>
     <string name="error_invalid_url">無效鏈接</string>
     <string name="error_get_ptoken_error">獲取 pToken 錯誤</string>
-    <string name="error_cant_create_temp_file">無法創建臨時文件</string>
     <string name="error_cant_save_image">無法保存圖片</string>
     <string name="error_invalid_number">非法數字</string>
 
@@ -71,12 +67,6 @@
     <string name="sign_in_failed">登錄失敗</string>
     <string name="sign_in_failed_tip">若持續出錯，請嘗試“通過網頁登錄”或“通過 Cookie 登錄”。</string>
     <string name="get_it">知道了</string>
-
-    <!-- Select scene -->
-    <string name="select_scene">你想選擇哪個畫廊站點？</string>
-    <string name="select_scene_explain">e-hentai：對任何人開放\nexhentai：僅對登錄用户開放</string>
-
-    <!-- Update -->
 
     <!-- Gallery List -->
     <string name="gallery_list_search_bar_hint_exhentai">搜索 ExHentai</string>
@@ -306,9 +296,8 @@
     <!-- Settings -->
     <string name="settings_eh">EH</string>
     <string name="settings_eh_sign_out">退出登錄</string>
-    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用於登錄該賬號。&lt;br&gt;&lt;b&gt;注意數據安全&lt;/b&gt;&lt;br&gt;&lt;br&gt;%s</string>
+    <string name="settings_eh_identity_cookies_signed">身份 Cookie 可用於登錄該賬號。&lt;br&gt;&lt;b&gt;注意數據安全&lt;/b&gt;</string>
     <string name="settings_eh_identity_cookies_guest">未登錄</string>
-    <string name="settings_eh_identity_cookies_copy">複製</string>
     <string name="settings_u_config">EHentai 設置</string>
     <string name="settings_u_config_summary">EHentai 網站上的設置</string>
     <string name="settings_my_tags">我的標籤</string>
