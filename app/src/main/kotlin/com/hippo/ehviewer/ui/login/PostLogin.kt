@@ -21,6 +21,7 @@ suspend fun postLogin() = coroutineScope {
     runCatching {
         // For the `star` cookie
         EhEngine.getNews(false)
+        EhCookieStore.copyNecessaryCookies()
 
         // Get cookies for image limits
         launch {
@@ -39,6 +40,6 @@ suspend fun postLogin() = coroutineScope {
         EhCookieStore.flush()
     }.onFailure {
         Settings.gallerySite = EhUrl.SITE_E
-    }
-    Settings.needSignIn = false
+        Settings.needSignIn = false
+    }.isSuccess
 }

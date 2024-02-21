@@ -60,6 +60,8 @@ import com.hippo.ehviewer.client.EhEngine
 import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.ui.StartDestination
+import com.hippo.ehviewer.ui.destinations.CookieSignInSceneDestination
+import com.hippo.ehviewer.ui.destinations.SelectSiteScreenDestination
 import com.hippo.ehviewer.ui.destinations.WebViewSignInScreenDestination
 import com.hippo.ehviewer.ui.openBrowser
 import com.hippo.ehviewer.ui.screen.popNavigate
@@ -131,8 +133,8 @@ fun SignInScreen(navigator: DestinationsNavigator) {
                     isProgressIndicatorVisible = false
                 }
             }.onSuccess {
-                withNonCancellableContext { postLogin() }
-                withUIContext { navigator.popNavigate(StartDestination) }
+                val canEx = withNonCancellableContext { postLogin() }
+                withUIContext { navigator.popNavigate(if (canEx) SelectSiteScreenDestination else StartDestination) }
             }
         }
     }
@@ -228,22 +230,36 @@ fun SignInScreen(navigator: DestinationsNavigator) {
                             )
                         }
                         TextButton(
-                            onClick = {
-                                Settings.needSignIn = false
-                                Settings.gallerySite = EhUrl.SITE_E
-                                navigator.popNavigate(StartDestination)
-                            },
+                            onClick = { navigator.navigate(CookieSignInSceneDestination) },
+                            modifier = Modifier.padding(horizontal = 8.dp),
                         ) {
                             Text(
                                 text = buildAnnotatedString {
                                     withStyle(
                                         style = SpanStyle(textDecoration = TextDecoration.Underline),
                                     ) {
-                                        append(stringResource(id = R.string.guest_mode))
+                                        append(stringResource(id = R.string.sign_in_via_cookies))
                                     }
                                 },
                             )
                         }
+                    }
+                    TextButton(
+                        onClick = {
+                            Settings.needSignIn = false
+                            Settings.gallerySite = EhUrl.SITE_E
+                            navigator.popNavigate(StartDestination)
+                        },
+                    ) {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(
+                                    style = SpanStyle(textDecoration = TextDecoration.Underline),
+                                ) {
+                                    append(stringResource(id = R.string.guest_mode))
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -296,6 +312,20 @@ fun SignInScreen(navigator: DestinationsNavigator) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.Center) {
                             TextButton(
+                                onClick = { navigator.navigate(CookieSignInSceneDestination) },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            ) {
+                                Text(
+                                    text = buildAnnotatedString {
+                                        withStyle(
+                                            style = SpanStyle(textDecoration = TextDecoration.Underline),
+                                        ) {
+                                            append(stringResource(id = R.string.sign_in_via_cookies))
+                                        }
+                                    },
+                                )
+                            }
+                            TextButton(
                                 onClick = { navigator.navigate(WebViewSignInScreenDestination) },
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             ) {
@@ -309,24 +339,24 @@ fun SignInScreen(navigator: DestinationsNavigator) {
                                     },
                                 )
                             }
-                            TextButton(
-                                onClick = {
-                                    Settings.needSignIn = false
-                                    Settings.gallerySite = EhUrl.SITE_E
-                                    navigator.popNavigate(StartDestination)
+                        }
+                        TextButton(
+                            onClick = {
+                                Settings.needSignIn = false
+                                Settings.gallerySite = EhUrl.SITE_E
+                                navigator.popNavigate(StartDestination)
+                            },
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        ) {
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(
+                                        style = SpanStyle(textDecoration = TextDecoration.Underline),
+                                    ) {
+                                        append(stringResource(id = R.string.guest_mode))
+                                    }
                                 },
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            ) {
-                                Text(
-                                    text = buildAnnotatedString {
-                                        withStyle(
-                                            style = SpanStyle(textDecoration = TextDecoration.Underline),
-                                        ) {
-                                            append(stringResource(id = R.string.guest_mode))
-                                        }
-                                    },
-                                )
-                            }
+                            )
                         }
                     }
                 }
