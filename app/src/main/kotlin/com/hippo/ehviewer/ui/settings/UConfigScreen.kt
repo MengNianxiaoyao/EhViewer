@@ -25,6 +25,7 @@ import com.google.accompanist.web.rememberWebViewState
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhUrl
+import com.hippo.ehviewer.ui.LockDrawer
 import com.hippo.ehviewer.util.setDefaultSettings
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -34,6 +35,7 @@ private const val APPLY_JS = "javascript:(function(){var apply = document.getEle
 @Destination
 @Composable
 fun UConfigScreen(navigator: DestinationsNavigator) {
+    LockDrawer(true)
     val url = EhUrl.uConfigUrl
     val webview = remember { Atomic<WebView?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -64,9 +66,7 @@ fun UConfigScreen(navigator: DestinationsNavigator) {
         WebView(
             state = state,
             modifier = Modifier.padding(paddingValues).fillMaxSize(),
-            onCreated = {
-                it.setDefaultSettings()
-            },
+            onCreated = { it.setDefaultSettings() },
             factory = { WebView(it).apply { webview.set(this) } },
         )
         val applyTip = stringResource(id = R.string.apply_tip)

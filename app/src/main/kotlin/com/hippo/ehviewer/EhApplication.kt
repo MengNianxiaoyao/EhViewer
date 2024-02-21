@@ -17,10 +17,8 @@
 package com.hippo.ehviewer
 
 import android.app.Application
-import android.content.ComponentCallbacks2
 import android.content.Context
 import android.os.StrictMode
-import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.collection.LruCache
@@ -76,6 +74,9 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import java.io.File
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import logcat.AndroidLogcatLogger
+import logcat.LogPriority
+import logcat.LogcatLogger
 import moe.tarsin.coroutines.runSuspendCatching
 import okhttp3.AsyncDns
 import okhttp3.android.AndroidAsyncDns
@@ -96,6 +97,9 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
                     AppCompatDelegate.setDefaultNightMode(mode)
                 }
             }
+            if (!LogcatLogger.isInstalled && Settings.saveCrashLog) {
+                LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
+            }
         }
         lifecycle.addObserver(lockObserver)
         val handler = Thread.getDefaultUncaughtExceptionHandler()
@@ -110,7 +114,6 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
         }
         super.onCreate()
         System.loadLibrary("ehviewer")
-        System.loadLibrary("ehviewer_rust")
         ReadableTime.initialize(this)
         lifecycleScope.launchIO {
             launchIO {
@@ -135,7 +138,7 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
                         }
                     }
                 }.onFailure {
-                    it.printStackTrace()
+                    logcat(it)
                 }
             }
             launchIO {
@@ -151,7 +154,7 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
         if (BuildConfig.DEBUG) {
             StrictMode.enableDefaults()
             Snapshot.registerApplyObserver { anies, _ ->
-                logcat(Log.VERBOSE) { anies.toString() }
+                logcat(LogPriority.VERBOSE) { anies.toString() }
             }
         }
     }
@@ -160,12 +163,12 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
         runCatching {
             keepNoMediaFileStatus()
         }.onFailure {
-            it.printStackTrace()
+            logcat(it)
         }
         runCatching {
             clearTempDir()
         }.onFailure {
-            it.printStackTrace()
+            logcat(it)
         }
     }
 
@@ -177,14 +180,6 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
         dir = AppConfig.externalTempDir
         if (null != dir) {
             FileUtils.deleteContent(dir)
-        }
-    }
-
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-            // Keep one entry for GalleryCommentsScreen
-            galleryDetailCache.trimToSize(1)
         }
     }
 

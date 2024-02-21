@@ -16,7 +16,6 @@
 package com.hippo.ehviewer.gallery
 
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import com.hippo.ehviewer.Settings.archivePasswds
 import com.hippo.ehviewer.image.ByteBufferSource
 import com.hippo.ehviewer.image.Image
@@ -31,6 +30,7 @@ import com.hippo.ehviewer.jni.releaseByteBuffer
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.unifile.UniFile
 import com.hippo.unifile.displayPath
+import eu.kanade.tachiyomi.util.system.logcat
 import java.nio.ByteBuffer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -53,7 +53,7 @@ class ArchivePageLoader(
 ) : PageLoader2(gid, startPage) {
     private lateinit var pfd: ParcelFileDescriptor
     private val hostJob = launch(start = CoroutineStart.LAZY) {
-        Log.d(DEBUG_TAG, "Open archive ${file.uri.displayPath}")
+        logcat(DEBUG_TAG) { "Open archive ${file.uri.displayPath}" }
         pfd = file.openFileDescriptor("r")
         size = openArchive(pfd.fd, pfd.statSize)
         if (size == 0) {
@@ -81,7 +81,7 @@ class ArchivePageLoader(
         super.stop()
         closeArchive()
         pfd.close()
-        Log.d(DEBUG_TAG, "Close archive ${file.uri.displayPath} successfully!")
+        logcat(DEBUG_TAG) { "Close archive ${file.uri.displayPath} successfully!" }
     }
 
     private val mJobMap = hashMapOf<Int, Job>()
@@ -160,7 +160,7 @@ class ArchivePageLoader(
                 extractToFd(index, it.fd)
             }
         }.getOrElse {
-            it.printStackTrace()
+            logcat(it)
             false
         }
     }

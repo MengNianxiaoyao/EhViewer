@@ -15,14 +15,13 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.spotless)
     alias(libs.plugins.aboutlibrariesPlugin)
-    alias(libs.plugins.rustAndroidPlugin)
     alias(libs.plugins.composeCompilerReportGenerator)
 }
 
 android {
-    compileSdk = 34
-    buildToolsVersion = "34.0.0"
-    ndkVersion = "26.1.10909125"
+    compileSdkPreview = "VanillaIceCream"
+    buildToolsVersion = "35.0.0-rc1"
+    ndkVersion = "26.2.11394342"
 
     splits {
         abi {
@@ -123,6 +122,7 @@ android {
             "-progressive",
             "-Xjvm-default=all",
             "-Xlambdas=indy",
+            "-Xcontext-receivers",
 
             "-opt-in=coil3.annotation.ExperimentalCoilApi",
             "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
@@ -140,6 +140,7 @@ android {
             "-opt-in=splitties.preferences.DataStorePreferencesPreview",
 
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:experimentalStrongSkipping=true",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:nonSkippingGroupOptimization=true",
         )
     }
 
@@ -207,10 +208,9 @@ dependencies {
     // https://developer.android.com/jetpack/androidx/releases/lifecycle
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // https://developer.android.com/jetpack/androidx/releases/navigation
-    implementation(libs.bundles.androidx.navigation)
+    implementation(libs.androidx.navigation.compose)
 
     // https://developer.android.com/jetpack/androidx/releases/paging
     implementation(libs.androidx.paging.compose)
@@ -234,6 +234,8 @@ dependencies {
     implementation(libs.bundles.okhttp)
 
     implementation(libs.okio.jvm)
+
+    implementation(libs.logcat)
 
     implementation(libs.diff)
 
@@ -266,12 +268,6 @@ dependencies {
     "gmsImplementation"(libs.bundles.cronet)
 }
 
-configurations.all {
-    resolutionStrategy {
-        exclude("androidx.navigation", "navigation-compose")
-    }
-}
-
 kotlin {
     jvmToolchain(21)
 }
@@ -286,13 +282,6 @@ aboutLibraries {
     duplicationRule = GROUP
 }
 
-cargo {
-    module = "src/main/rust"
-    libname = "ehviewer_rust"
-    targets = if (isRelease) listOf("arm", "x86", "arm64", "x86_64") else listOf("arm64", "x86_64")
-    if (isRelease) profile = "release"
-}
-
 spotless {
     kotlin {
         // https://github.com/diffplug/spotless/issues/111
@@ -301,13 +290,5 @@ spotless {
     }
     kotlinGradle {
         ktlint()
-    }
-}
-
-tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("JniLibFolders")) {
-        dependsOn("cargoBuild")
-        // fix mergeDebugJniLibFolders  UP-TO-DATE
-        inputs.dir(layout.buildDirectory.dir("rustJniLibs/android"))
     }
 }

@@ -74,6 +74,7 @@ import com.jamal.composeprefs3.ui.ifNotNullThen
 import com.jamal.composeprefs3.ui.ifTrueThen
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -108,6 +109,10 @@ class DialogState {
             }
         }
         content = { block(realContinuation) }
+    }.also {
+        // Workaround SlotTable modification race
+        // IssueTracker: https://issuetracker.google.com/issues/325502738
+        delay(100)
     }
 
     suspend fun <R> awaitResult(
@@ -407,8 +412,16 @@ class DialogState {
     suspend fun showSingleChoice(
         items: List<String>,
         selected: Int,
+        @StringRes title: Int? = null,
     ): Int = showNoButton {
         Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
+            title?.let {
+                Text(
+                    text = stringResource(id = it),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
             items.forEachIndexed { index, text ->
                 Row(
                     modifier = Modifier.clickable { dismissWith(index) }.fillMaxWidth()

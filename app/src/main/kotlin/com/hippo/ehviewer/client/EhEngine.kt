@@ -54,6 +54,7 @@ import com.hippo.ehviewer.dailycheck.today
 import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ReadableTime
 import com.hippo.ehviewer.util.StatusCodeException
+import eu.kanade.tachiyomi.util.system.logcat
 import io.ktor.client.request.forms.append
 import io.ktor.client.statement.HttpStatement
 import io.ktor.client.statement.bodyAsChannel
@@ -203,7 +204,7 @@ object EhEngine {
         }.onFailure { throwable ->
             // It may get redirected when accessing ex for the first time
             if (url == EhUrl.URL_UCONFIG_EX) {
-                throwable.printStackTrace()
+                logcat(throwable)
                 ehRequest(url).fetchUsingAsText { check(U_CONFIG_TEXT in this) { "Unable to load config from $url!" } }
             } else {
                 throw throwable
@@ -211,7 +212,7 @@ object EhEngine {
         }
     }
 
-    suspend fun getGalleryPage(url: String, gid: Long, token: String?): GalleryPageParser.Result {
+    suspend fun getGalleryPage(url: String, gid: Long, token: String): GalleryPageParser.Result {
         val referer = EhUrl.getGalleryDetailUrl(gid, token)
         return ehRequest(url, referer).fetchUsingAsText(GalleryPageParser::parse)
     }
@@ -275,7 +276,7 @@ object EhEngine {
         }
     }
 
-    suspend fun modifyFavorites(gid: Long, token: String?, dstCat: Int = -1, note: String = "") {
+    suspend fun modifyFavorites(gid: Long, token: String, dstCat: Int = -1, note: String = "") {
         val catStr: String = when (dstCat) {
             -1 -> "favdel"
             in 0..9 -> dstCat.toString()
@@ -359,11 +360,11 @@ object EhEngine {
         }.fetchUsingAsText { GalleryPageParser.parse(filterNot { it == '\\' }) }
     }
 
-    suspend fun rateGallery(apiUid: Long, apiKey: String?, gid: Long, token: String?, rating: Float): RateGalleryResult = ehRequest(EhUrl.apiUrl, EhUrl.getGalleryDetailUrl(gid, token), EhUrl.origin) {
+    suspend fun rateGallery(apiUid: Long, apiKey: String?, gid: Long, token: String, rating: Float): RateGalleryResult = ehRequest(EhUrl.apiUrl, EhUrl.getGalleryDetailUrl(gid, token), EhUrl.origin) {
         jsonBody {
             put("method", "rategallery")
             put("apiuid", apiUid)
-            put("apikey", apiKey)
+            put("apikey", requireNotNull(apiKey))
             put("gid", gid)
             put("token", token)
             put("rating", ceil((rating * 2).toDouble()).toInt())
@@ -393,12 +394,12 @@ object EhEngine {
             }
         }
 
-    suspend fun voteComment(apiUid: Long, apiKey: String?, gid: Long, token: String?, commentId: Long, commentVote: Int): VoteCommentResult =
+    suspend fun voteComment(apiUid: Long, apiKey: String?, gid: Long, token: String, commentId: Long, commentVote: Int): VoteCommentResult =
         ehRequest(EhUrl.apiUrl, EhUrl.referer, EhUrl.origin) {
             jsonBody {
                 put("method", "votecomment")
                 put("apiuid", apiUid)
-                put("apikey", apiKey)
+                put("apikey", requireNotNull(apiKey))
                 put("gid", gid)
                 put("token", token)
                 put("comment_id", commentId)
@@ -406,12 +407,12 @@ object EhEngine {
             }
         }.fetchUsingAsText(String::parseAs)
 
-    suspend fun voteTag(apiUid: Long, apiKey: String?, gid: Long, token: String?, tags: String?, vote: Int) =
+    suspend fun voteTag(apiUid: Long, apiKey: String?, gid: Long, token: String, tags: String, vote: Int) =
         ehRequest(EhUrl.apiUrl, EhUrl.referer, EhUrl.origin) {
             jsonBody {
                 put("method", "taggallery")
                 put("apiuid", apiUid)
-                put("apikey", apiKey)
+                put("apikey", requireNotNull(apiKey))
                 put("gid", gid)
                 put("token", token)
                 put("tags", tags)

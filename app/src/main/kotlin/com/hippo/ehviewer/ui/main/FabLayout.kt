@@ -21,7 +21,6 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,6 +34,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.hippo.ehviewer.ui.tools.delegateSnapshotUpdate
+import com.hippo.ehviewer.ui.tools.snackBarPadding
 import eu.kanade.tachiyomi.util.lang.launchIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -105,7 +106,6 @@ fun FabLayout(
     expanded: Boolean,
     onExpandChanged: (Boolean) -> Unit,
     autoCancel: Boolean,
-    rotateWhenExpand: Boolean = true,
     fabBuilder: FabBuilder.() -> Unit,
 ) {
     val updatedHidden by rememberUpdatedState(hidden)
@@ -128,9 +128,10 @@ fun FabLayout(
     }
     val builder by rememberUpdatedState(fabBuilder)
 
-    val secondaryFab by remember {
-        snapshotFlow { buildFab(builder) }.onEachLatest { state.waitCollapse() }
-    }.collectAsState(emptyList())
+    val secondaryFab by delegateSnapshotUpdate {
+        record { buildFab(builder) }
+        transform { onEachLatest { state.waitCollapse() } }
+    }
     val coroutineScope = rememberCoroutineScope()
     if (updatedExpanded && autoCancel) {
         Spacer(
@@ -141,7 +142,7 @@ fun FabLayout(
     }
     val appearState by state.appearProgress.asState()
     Box(
-        modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp),
+        modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp).snackBarPadding(),
         contentAlignment = Alignment.BottomEnd,
     ) {
         Box(
@@ -172,12 +173,8 @@ fun FabLayout(
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = null,
-                    modifier = if (rotateWhenExpand) {
-                        Modifier.graphicsLayer {
-                            rotationZ = lerp(-135f, 0f, animatedProgress)
-                        }
-                    } else {
-                        Modifier
+                    modifier = Modifier.graphicsLayer {
+                        rotationZ = lerp(-135f, 0f, animatedProgress)
                     },
                 )
             }

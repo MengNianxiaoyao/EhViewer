@@ -107,6 +107,7 @@ import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withUIContext
 import eu.kanade.tachiyomi.util.system.isNightMode
+import eu.kanade.tachiyomi.util.system.logcat
 import java.io.File
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -151,17 +152,7 @@ class ReaderActivity : EhActivity() {
         }
 
     private val galleryDetailUrl: String?
-        get() {
-            val gid: Long
-            val token: String
-            if (mGalleryInfo != null) {
-                gid = mGalleryInfo!!.gid
-                token = mGalleryInfo!!.token!!
-            } else {
-                return null
-            }
-            return EhUrl.getGalleryDetailUrl(gid, token, 0, false)
-        }
+        get() = mGalleryInfo?.run { EhUrl.getGalleryDetailUrl(gid, token) }
 
     private suspend fun buildProvider(replace: Boolean = false): PageLoader2? {
         mGalleryProvider?.let {
@@ -457,7 +448,7 @@ class ReaderActivity : EhActivity() {
                     try {
                         resolver.delete(imageUri, null, null)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        logcat(e)
                     }
                     return@launchIO makeToast(R.string.error_cant_save_image)
                 } else if (isAtLeastQ) {
@@ -484,7 +475,7 @@ class ReaderActivity : EhActivity() {
                     makeToast(getString(R.string.image_saved, it.displayPath))
                 }
             }.onFailure {
-                it.printStackTrace()
+                logcat(it)
                 makeToast(R.string.error_cant_find_activity)
             }
         }

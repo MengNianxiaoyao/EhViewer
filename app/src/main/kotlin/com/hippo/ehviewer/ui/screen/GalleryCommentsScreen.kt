@@ -54,8 +54,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -82,9 +82,9 @@ import com.hippo.ehviewer.client.data.GalleryComment
 import com.hippo.ehviewer.client.data.ListUrlBuilder
 import com.hippo.ehviewer.dao.Filter
 import com.hippo.ehviewer.dao.FilterMode
+import com.hippo.ehviewer.ui.LocalSnackBarHostState
 import com.hippo.ehviewer.ui.LockDrawer
 import com.hippo.ehviewer.ui.MainActivity
-import com.hippo.ehviewer.ui.destinations.GalleryListScreenDestination
 import com.hippo.ehviewer.ui.jumpToReaderByPage
 import com.hippo.ehviewer.ui.legacy.CoilImageGetter
 import com.hippo.ehviewer.ui.main.GalleryCommentCard
@@ -93,6 +93,7 @@ import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.animateFloatMergePredictiveBackAsState
 import com.hippo.ehviewer.ui.tools.normalizeSpan
 import com.hippo.ehviewer.ui.tools.rememberBBCodeTextToolbar
+import com.hippo.ehviewer.ui.tools.snackBarPadding
 import com.hippo.ehviewer.ui.tools.toAnnotatedString
 import com.hippo.ehviewer.ui.tools.toBBCode
 import com.hippo.ehviewer.ui.tools.updateSpan
@@ -153,6 +154,7 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
     LockDrawer(true)
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val dialogState = LocalDialogState.current
+    val snackbarState = LocalSnackBarHostState.current
     val coroutineScope = rememberCoroutineScope()
 
     var commenting by rememberSaveable { mutableStateOf(false) }
@@ -201,22 +203,24 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
             logcat("sendComment") { bbcode }
             EhEngine.commentGallery(url, bbcode, commentId)
         }.onSuccess {
-            activity.showTip(if (commentId != -1L) editCommentSuccess else commentSuccess)
+            val msg = if (commentId != -1L) editCommentSuccess else commentSuccess
             userComment = TextFieldValue()
             commentId = -1L
             comments = it
+            snackbarState.showSnackbar(msg)
         }.onFailure {
             val text = if (commentId != -1L) editCommentFail else commentFail
-            activity.showTip(text + "\n" + ExceptionUtils.getReadableString(it))
+            snackbarState.showSnackbar(text + "\n" + ExceptionUtils.getReadableString(it))
         }
     }
 
+    val filterAdded = stringResource(R.string.filter_added)
     suspend fun showFilterCommenter(comment: GalleryComment) {
         val commenter = comment.user ?: return
         dialogState.awaitPermissionOrCancel { Text(text = stringResource(R.string.filter_the_commenter, commenter)) }
         Filter(FilterMode.COMMENTER, commenter).remember()
         comments = comments.copy(comments = comments.comments.filterNot { it.user == commenter })
-        activity.showTip(R.string.filter_added)
+        snackbarState.showSnackbar(filterAdded)
     }
 
     suspend fun showCommentVoteStatus(comment: GalleryComment) {
@@ -270,6 +274,7 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
                         }
                         commenting = true
                     },
+                    modifier = Modifier.snackBarPadding(),
                 ) {
                     Icon(imageVector = Icons.AutoMirrored.Default.Reply, contentDescription = null)
                 }
@@ -297,6 +302,11 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
                     0.dp
                 }
             }
+            val voteUpSucceed = stringResource(R.string.vote_up_successfully)
+            val cancelVoteUpSucceed = stringResource(R.string.cancel_vote_up_successfully)
+            val voteDownSucceed = stringResource(R.string.vote_down_successfully)
+            val cancelVoteDownSucceed = stringResource(R.string.cancel_vote_down_successfully)
+            val voteFailed = stringResource(R.string.vote_failed)
             LazyColumn(
                 modifier = Modifier.padding(horizontal = keylineMargin),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -315,15 +325,15 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
                                 refreshComment(true)
                             }
                         }.onSuccess { result ->
-                            activity.showTip(
+                            snackbarState.showSnackbar(
                                 if (isUp) {
-                                    if (0 != result.vote) R.string.vote_up_successfully else R.string.cancel_vote_up_successfully
+                                    if (0 != result.vote) voteUpSucceed else cancelVoteUpSucceed
                                 } else {
-                                    if (0 != result.vote) R.string.vote_down_successfully else R.string.cancel_vote_down_successfully
+                                    if (0 != result.vote) voteDownSucceed else cancelVoteDownSucceed
                                 },
                             )
                         }.onFailure {
-                            activity.showTip(R.string.vote_failed)
+                            snackbarState.showSnackbar(voteFailed)
                         }
                     }
 
@@ -366,7 +376,7 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
                                 mode = ListUrlBuilder.MODE_UPLOADER,
                                 mKeyword = item.user,
                             )
-                            navigator.navigate(GalleryListScreenDestination(lub))
+                            navigator.navigate(lub.asDst())
                         },
                         onCardClick = {
                             coroutineScope.launch {
@@ -425,7 +435,10 @@ fun GalleryCommentsScreen(gid: Long, navigator: DestinationsNavigator) {
                     layout(width, height) {
                         placeable.placeRelative(0, 0)
                     }
-                }.clip(RoundedCornerShape((animationProgress * 100).roundToInt())).height(IntrinsicSize.Min),
+                }.graphicsLayer {
+                    shape = RoundedCornerShape((animationProgress * 100).roundToInt())
+                    clip = true
+                }.height(IntrinsicSize.Min),
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 Row(

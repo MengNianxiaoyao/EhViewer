@@ -17,12 +17,10 @@
  */
 package com.hippo.ehviewer.image
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ColorSpace
 import android.graphics.Rect
 import android.graphics.drawable.Animatable
-import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import arrow.core.Either
@@ -32,7 +30,6 @@ import coil3.BitmapImage
 import coil3.DrawableImage
 import coil3.Image as CoilImage
 import coil3.asCoilImage
-import coil3.executeBlocking
 import coil3.imageLoader
 import coil3.request.CachePolicy
 import coil3.request.ErrorResult
@@ -41,7 +38,6 @@ import coil3.request.allowHardware
 import coil3.request.colorSpace
 import coil3.size.Precision
 import coil3.size.Scale
-import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.jni.isGif
 import com.hippo.ehviewer.jni.mmap
@@ -53,6 +49,7 @@ import com.hippo.ehviewer.util.isAtLeastP
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.isAtLeastU
 import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.util.system.logcat
 import java.nio.ByteBuffer
 import splitties.init.appCtx
 
@@ -96,7 +93,6 @@ class Image private constructor(image: CoilImage, private val src: AutoCloseable
     }
 
     companion object {
-        private val imageSearchMaxSize = appCtx.resources.getDimensionPixelOffset(R.dimen.image_search_max_size)
         private val targetWidth = appCtx.resources.displayMetrics.widthPixels * 2
         private val targetHeight = appCtx.resources.displayMetrics.heightPixels * 2
 
@@ -163,22 +159,8 @@ class Image private constructor(image: CoilImage, private val src: AutoCloseable
                 }
             }.onFailure {
                 src.close()
-                it.printStackTrace()
+                logcat(it)
             }.getOrNull()
-        }
-
-        fun Context.decodeBitmap(uri: Uri): Bitmap {
-            val req = imageRequest {
-                memoryCachePolicy(CachePolicy.DISABLED)
-                data(uri)
-                size(imageSearchMaxSize)
-                scale(Scale.FILL)
-            }
-            val image = when (val result = appCtx.imageLoader.executeBlocking(req)) {
-                is SuccessResult -> result.image
-                is ErrorResult -> throw result.throwable
-            }
-            return (image as BitmapImage).bitmap
         }
     }
 }
