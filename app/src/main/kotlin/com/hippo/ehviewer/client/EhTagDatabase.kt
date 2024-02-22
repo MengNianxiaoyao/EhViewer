@@ -25,6 +25,9 @@ import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.FileUtils
 import com.hippo.ehviewer.util.StatusCodeException
 import com.hippo.ehviewer.util.copyTo
+import com.hippo.unifile.asUniFile
+import com.hippo.unifile.sha1
+import eu.kanade.tachiyomi.util.system.logcat
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
@@ -41,8 +44,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.tarsin.coroutines.runSuspendCatching
 import okio.BufferedSource
-import okio.HashingSink.Companion.sha1
-import okio.blackholeSink
 import okio.buffer
 import okio.source
 import splitties.init.appCtx
@@ -162,19 +163,8 @@ object EhTagDatabase : CoroutineScope {
         }.getOrNull()
     }
 
-    private fun getFileSha1(file: File): String? {
-        return runCatching {
-            file.source().buffer().use { source ->
-                sha1(blackholeSink()).use {
-                    source.readAll(it)
-                    it.hash.hex()
-                }
-            }
-        }.getOrNull()
-    }
-
     private fun checkData(sha1: String?, data: File): Boolean {
-        return sha1 != null && sha1 == getFileSha1(data)
+        return sha1 != null && sha1 == data.asUniFile().sha1()
     }
 
     private suspend fun save(client: HttpClient, url: String, file: File) {
@@ -213,7 +203,7 @@ object EhTagDatabase : CoroutineScope {
                 runSuspendCatching {
                     issueUpdateInMemoryData()
                 }.onFailure {
-                    it.printStackTrace()
+                    logcat(it)
                 }
                 updateInternal()
             }
@@ -272,7 +262,7 @@ object EhTagDatabase : CoroutineScope {
                 // Read new EhTagDatabase
                 issueUpdateInMemoryData(dataFile)
             }.onFailure {
-                it.printStackTrace()
+                logcat(it)
             }
         }
     }

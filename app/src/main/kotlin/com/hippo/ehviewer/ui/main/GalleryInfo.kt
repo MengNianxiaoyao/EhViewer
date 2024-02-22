@@ -1,6 +1,7 @@
 package com.hippo.ehviewer.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -24,11 +25,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.BrushPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.text.font.FontStyle
@@ -91,11 +96,13 @@ fun GalleryInfoListItem(
     modifier: Modifier = Modifier,
     isInFavScene: Boolean = false,
     showPages: Boolean = false,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     CrystalCard(
         modifier = modifier,
         onClick = onClick,
         onLongClick = onLongClick,
+        interactionSource = interactionSource,
     ) {
         Row {
             Card {
@@ -190,22 +197,28 @@ fun GalleryInfoGridItem(
     onLongClick: () -> Unit,
     info: GalleryInfo,
     modifier: Modifier = Modifier,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
-    val aspect = if (info.thumbHeight != 0) {
-        (info.thumbWidth.toFloat() / info.thumbHeight).coerceIn(MIN_ASPECT, MAX_ASPECT)
-    } else {
-        DEFAULT_ASPECT
-    }
     val simpleLang = info.simpleLanguage
     ElevatedCard(
         modifier = modifier,
         onClick = onClick,
         onLongClick = onLongClick,
+        interactionSource = interactionSource,
     ) {
         Box {
+            val placeholder = remember {
+                val aspect = if (info.thumbHeight != 0) {
+                    (info.thumbWidth.toFloat() / info.thumbHeight).coerceIn(MIN_ASPECT, MAX_ASPECT)
+                } else {
+                    DEFAULT_ASPECT
+                }
+                BrushPainter(Brush.linearGradient(PlaceholderColors, end = Offset(aspect, 1f)))
+            }
             EhAsyncThumb(
                 model = info,
-                modifier = Modifier.aspectRatio(aspect).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = placeholder,
                 contentScale = ContentScale.Crop,
             )
             val categoryColor = EhUtils.getCategoryColor(info.category)
@@ -221,6 +234,8 @@ fun GalleryInfoGridItem(
         }
     }
 }
+
+private val PlaceholderColors = listOf(Color.Transparent, Color.Transparent)
 
 private const val MIN_ASPECT = 0.33F
 private const val MAX_ASPECT = 1.5F

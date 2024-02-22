@@ -52,6 +52,7 @@ import com.hippo.unifile.displayPath
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.launchNonCancellable
+import eu.kanade.tachiyomi.util.system.logcat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import moe.tarsin.coroutines.runSuspendCatching
@@ -145,6 +146,11 @@ fun DownloadScreen(navigator: DestinationsNavigator) {
                 summary = stringResource(id = R.string.settings_download_download_origin_image_summary),
                 value = Settings::downloadOriginImage,
             )
+            SwitchPreference(
+                title = stringResource(id = R.string.settings_download_archive_metadata),
+                summary = stringResource(id = R.string.settings_download_archive_metadata_summary),
+                value = Settings::archiveMetadata,
+            )
             WorkPreference(
                 title = stringResource(id = R.string.settings_download_restore_download_items),
                 summary = stringResource(id = R.string.settings_download_restore_download_items_summary),
@@ -174,7 +180,7 @@ fun DownloadScreen(navigator: DestinationsNavigator) {
                         }
                         RestoreItem(dirname, gid, token)
                     }.onFailure {
-                        it.printStackTrace()
+                        logcat(it)
                     }.getOrNull()
                 }
                 runCatching {
@@ -182,7 +188,7 @@ fun DownloadScreen(navigator: DestinationsNavigator) {
                         runSuspendCatching {
                             fillGalleryListByApi(this, EhUrl.referer)
                         }.onFailure {
-                            it.printStackTrace()
+                            logcat(it)
                         }
                     }
                     if (result.isEmpty()) {
@@ -198,7 +204,7 @@ fun DownloadScreen(navigator: DestinationsNavigator) {
                         launchSnackBar(RESTORE_COUNT_MSG(count + restoreDirCount))
                     }
                 }.onFailure {
-                    it.printStackTrace()
+                    logcat(it)
                 }
             }
             WorkPreference(
@@ -222,7 +228,7 @@ fun DownloadScreen(navigator: DestinationsNavigator) {
                     val cnt = downloadLocation.listFiles().sumOf { clearFile(it).compareTo(false) }
                     launchSnackBar(FINAL_CLEAR_REDUNDANCY_MSG(cnt))
                 }.onFailure {
-                    it.printStackTrace()
+                    logcat(it)
                 }
             }
         }

@@ -1,6 +1,5 @@
 package com.hippo.ehviewer.ui.screen
 
-import android.graphics.Bitmap
 import android.net.Uri
 import android.view.ViewConfiguration
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,14 +27,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text2.input.rememberTextFieldState
-import androidx.compose.foundation.text2.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.LastPage
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
@@ -51,7 +51,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -61,7 +60,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -103,6 +101,7 @@ import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_NORMAL
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_SUBSCRIPTION
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_TAG
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_TOPLIST
+import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_UPLOADER
 import com.hippo.ehviewer.client.data.ListUrlBuilder.Companion.MODE_WHATS_HOT
 import com.hippo.ehviewer.client.parser.GalleryDetailUrlParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
@@ -110,11 +109,9 @@ import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.dao.QuickSearch
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.filled.GoTo
-import com.hippo.ehviewer.image.Image.Companion.decodeBitmap
 import com.hippo.ehviewer.ui.LocalSideSheetState
+import com.hippo.ehviewer.ui.LocalSnackBarHostState
 import com.hippo.ehviewer.ui.MainActivity
-import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
-import com.hippo.ehviewer.ui.destinations.GalleryListScreenDestination
 import com.hippo.ehviewer.ui.destinations.ProgressScreenDestination
 import com.hippo.ehviewer.ui.doGalleryInfoAction
 import com.hippo.ehviewer.ui.main.AdvancedSearchOption
@@ -131,25 +128,27 @@ import com.hippo.ehviewer.ui.tools.DragHandle
 import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.SwipeToDismissBox2
 import com.hippo.ehviewer.ui.tools.animateFloatMergePredictiveBackAsState
+import com.hippo.ehviewer.ui.tools.delegateSnapshotUpdate
 import com.hippo.ehviewer.ui.tools.draggingHapticFeedback
+import com.hippo.ehviewer.ui.tools.foldToLoadResult
 import com.hippo.ehviewer.ui.tools.observed
 import com.hippo.ehviewer.ui.tools.rememberInVM
-import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.FavouriteStatusRouter
 import com.hippo.ehviewer.util.findActivity
 import com.hippo.ehviewer.util.pickVisualMedia
+import com.hippo.unifile.asUniFile
+import com.hippo.unifile.sha1
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.Direction
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
-import java.io.File
 import kotlin.math.roundToInt
+import kotlin.random.Random
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import moe.tarsin.coroutines.onEachLatest
 import moe.tarsin.coroutines.runSuspendCatching
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyColumnState
@@ -185,9 +184,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     var category by rememberSaveable { mutableIntStateOf(Settings.searchCategory) }
     var searchMethod by rememberSaveable { mutableIntStateOf(1) }
     var advancedSearchOption by rememberSaveable { mutableStateOf(AdvancedSearchOption()) }
-    var useSimilarityScan by rememberSaveable { mutableStateOf(false) }
-    var searchCoverOnly by rememberSaveable { mutableStateOf(false) }
-    var imagePath by rememberSaveable { mutableStateOf("") }
+    var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     LaunchedEffect(urlBuilder) {
         if (urlBuilder.mode == MODE_SUBSCRIPTION) searchMethod = 2
@@ -203,6 +200,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
         }
     }
 
+    // Fix crash when TextField with focus is scaled to 0
     val focusManager = LocalFocusManager.current
     LaunchedEffect(showSearchLayout) {
         if (!showSearchLayout) {
@@ -215,6 +213,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
         animationSpec = tween(FAB_ANIMATE_TIME * 2),
     ) { showSearchLayout = false }
     val context = LocalContext.current
+    val snackbarState = LocalSnackBarHostState.current
     val activity = remember { context.findActivity<MainActivity>() }
     val density = LocalDensity.current
     val dialogState = LocalDialogState.current
@@ -233,49 +232,38 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 override suspend fun load(params: LoadParams<String>) = withIOContext {
                     if (urlBuilder.mode == MODE_TOPLIST) {
                         // TODO: Since we know total pages, let pager support jump
-                        val key = (params.key ?: urlBuilder.mJumpTo ?: "0").toInt()
+                        val key = (params.key ?: urlBuilder.mJumpTo)?.toInt() ?: 0
                         val prev = (key - 1).takeIf { it > 0 }
                         val next = (key + 1).takeIf { it < TOPLIST_PAGES }
                         runSuspendCatching {
                             urlBuilder.setJumpTo(key)
                             EhEngine.getGalleryList(urlBuilder.build())
-                        }.onFailure {
-                            return@withIOContext LoadResult.Error(it)
-                        }.onSuccess {
-                            urlBuilder.mJumpTo = null
-                            return@withIOContext LoadResult.Page(it.galleryInfoList, prev?.toString(), next?.toString())
+                        }.foldToLoadResult { result ->
+                            LoadResult.Page(result.galleryInfoList, prev?.toString(), next?.toString())
                         }
-                    }
-                    when (params) {
-                        is LoadParams.Prepend -> urlBuilder.setIndex(params.key, isNext = false)
-                        is LoadParams.Append -> urlBuilder.setIndex(params.key, isNext = true)
-                        is LoadParams.Refresh -> {
-                            val key = params.key
-                            if (key.isNullOrBlank()) {
-                                if (urlBuilder.mJumpTo != null) {
-                                    urlBuilder.mNext ?: urlBuilder.setIndex("2", true)
+                    } else {
+                        when (params) {
+                            is LoadParams.Prepend -> urlBuilder.setIndex(params.key, isNext = false)
+                            is LoadParams.Append -> urlBuilder.setIndex(params.key, isNext = true)
+                            is LoadParams.Refresh -> {
+                                val key = params.key
+                                if (key.isNullOrBlank()) {
+                                    if (urlBuilder.mJumpTo != null) {
+                                        urlBuilder.mNext ?: urlBuilder.setIndex("2", true)
+                                    }
+                                } else {
+                                    urlBuilder.setIndex(key, false)
                                 }
-                            } else {
-                                urlBuilder.setIndex(key, false)
                             }
                         }
-                    }
-                    val r = runSuspendCatching {
-                        if (MODE_IMAGE_SEARCH == urlBuilder.mode) {
-                            EhEngine.imageSearch(
-                                File(urlBuilder.imagePath!!),
-                                urlBuilder.isUseSimilarityScan,
-                                urlBuilder.isOnlySearchCovers,
-                            )
-                        } else {
+                        runSuspendCatching {
                             val url = urlBuilder.build()
                             EhEngine.getGalleryList(url)
+                        }.foldToLoadResult { result ->
+                            urlBuilder.mJumpTo = null
+                            LoadResult.Page(result.galleryInfoList, result.prev, result.next)
                         }
-                    }.onFailure {
-                        return@withIOContext LoadResult.Error(it)
-                    }.getOrThrow()
-                    urlBuilder.mJumpTo = null
-                    LoadResult.Page(r.galleryInfoList, r.prev, r.next)
+                    }
                 }
             }
         }.flow.cachedIn(viewModelScope)
@@ -341,55 +329,54 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                                 contentDescription = stringResource(id = R.string.readme),
                             )
                         }
+                        val invalidImageQuickSearch = stringResource(R.string.image_search_not_quick_search)
                         IconButton(onClick = {
                             if (data.itemCount == 0) return@IconButton
 
-                            if (urlBuilder.mode == MODE_IMAGE_SEARCH) {
-                                activity.showTip(R.string.image_search_not_quick_search, true)
-                                return@IconButton
-                            }
-
-                            val firstItem = data.itemSnapshotList.items[getFirstVisibleItemIndex()]
-                            val next = firstItem.gid + 1
-                            quickSearchList.fastForEach { q ->
-                                if (urlBuilder.equalsQuickSearch(q)) {
-                                    val nextStr = q.name.substringAfterLast('@', "")
-                                    if (nextStr.toLongOrNull() == next) {
-                                        activity.showTip(context.getString(R.string.duplicate_quick_search, q.name), true)
-                                        return@IconButton
-                                    }
-                                }
-                            }
-
                             coroutineScope.launch {
-                                dialogState.awaitInputTextWithCheckBox(
-                                    initial = quickSearchName ?: urlBuilder.keyword.orEmpty(),
-                                    title = R.string.add_quick_search_dialog_title,
-                                    hint = R.string.quick_search,
-                                    checked = saveProgress,
-                                    checkBoxText = R.string.save_progress,
-                                ) { input, checked ->
-                                    var text = input.trim()
-                                    if (text.isEmpty()) {
-                                        return@awaitInputTextWithCheckBox context.getString(R.string.name_is_empty)
+                                if (urlBuilder.mode == MODE_IMAGE_SEARCH) {
+                                    snackbarState.showSnackbar(invalidImageQuickSearch)
+                                } else {
+                                    val firstItem = data.itemSnapshotList.items[getFirstVisibleItemIndex()]
+                                    val next = firstItem.gid + 1
+                                    quickSearchList.fastForEach { q ->
+                                        if (urlBuilder.equalsQuickSearch(q)) {
+                                            val nextStr = q.name.substringAfterLast('@', "")
+                                            if (nextStr.toLongOrNull() == next) {
+                                                snackbarState.showSnackbar(context.getString(R.string.duplicate_quick_search, q.name))
+                                                return@launch
+                                            }
+                                        }
                                     }
+                                    dialogState.awaitInputTextWithCheckBox(
+                                        initial = quickSearchName ?: urlBuilder.keyword.orEmpty(),
+                                        title = R.string.add_quick_search_dialog_title,
+                                        hint = R.string.quick_search,
+                                        checked = saveProgress,
+                                        checkBoxText = R.string.save_progress,
+                                    ) { input, checked ->
+                                        var text = input.trim()
+                                        if (text.isEmpty()) {
+                                            return@awaitInputTextWithCheckBox context.getString(R.string.name_is_empty)
+                                        }
 
-                                    if (checked) {
-                                        text += "@$next"
-                                    }
-                                    if (quickSearchList.fastAny { it.name == text }) {
-                                        return@awaitInputTextWithCheckBox context.getString(R.string.duplicate_name)
-                                    }
+                                        if (checked) {
+                                            text += "@$next"
+                                        }
+                                        if (quickSearchList.fastAny { it.name == text }) {
+                                            return@awaitInputTextWithCheckBox context.getString(R.string.duplicate_name)
+                                        }
 
-                                    val quickSearch = urlBuilder.toQuickSearch(text)
-                                    quickSearch.position = quickSearchList.size
-                                    // Insert to DB first to update the id
-                                    withIOContext {
-                                        EhDB.insertQuickSearch(quickSearch)
+                                        val quickSearch = urlBuilder.toQuickSearch(text)
+                                        quickSearch.position = quickSearchList.size
+                                        // Insert to DB first to update the id
+                                        withIOContext {
+                                            EhDB.insertQuickSearch(quickSearch)
+                                        }
+                                        quickSearchList.add(quickSearch)
+                                        saveProgress = checked
+                                        return@awaitInputTextWithCheckBox null
                                     }
-                                    quickSearchList.add(quickSearch)
-                                    saveProgress = checked
-                                    return@awaitInputTextWithCheckBox null
                                 }
                             }
                         }) {
@@ -423,9 +410,15 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                         itemsIndexed(quickSearchList, key = { _, item -> item.id!! }) { index, item ->
                             ReorderableItem(reorderableLazyListState, key = item.id!!) { isDragging ->
                                 val dismissState = rememberSwipeToDismissBoxState(
-                                    confirmValueChange = {
-                                        if (it == SwipeToDismissBoxValue.EndToStart) {
-                                            quickSearchList.remove(item)
+                                    confirmValueChange = { value ->
+                                        if (value == SwipeToDismissBoxValue.EndToStart) {
+                                            quickSearchList.run {
+                                                val removeIndex = indexOf(item)
+                                                subList(removeIndex + 1, size).forEach {
+                                                    it.position--
+                                                }
+                                                removeAt(removeIndex)
+                                            }
                                             coroutineScope.launchIO {
                                                 EhDB.deleteQuickSearch(item)
                                             }
@@ -448,7 +441,8 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                                     ListItem(
                                         modifier = Modifier.clickable {
                                             if (urlBuilder.mode == MODE_WHATS_HOT) {
-                                                navigator.navigate(GalleryListScreenDestination(ListUrlBuilder(item)))
+                                                val builder = ListUrlBuilder(item)
+                                                navigator.navigate(builder.asDst())
                                             } else {
                                                 urlBuilder = ListUrlBuilder(item)
                                                 data.refresh()
@@ -503,7 +497,8 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
         data.loadState.refresh is LoadState.NotLoading
     }
 
-    var hidden by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
+    var fabHidden by remember { mutableStateOf(false) }
 
     val openGalleryKeyword = stringResource(R.string.gallery_list_search_bar_open_gallery)
     abstract class UrlSuggestion : Suggestion() {
@@ -516,22 +511,13 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
         abstract val destination: Direction
     }
 
-    class GalleryDetailUrlSuggestion(
-        gid: Long,
-        token: String,
-    ) : UrlSuggestion() {
-        override val destination = GalleryDetailScreenDestination(TokenArgs(gid, token))
+    class GalleryDetailUrlSuggestion(gid: Long, token: String) : UrlSuggestion() {
+        override val destination = gid asDstWith token
     }
 
-    class GalleryPageUrlSuggestion(
-        gid: Long,
-        pToken: String,
-        page: Int,
-    ) : UrlSuggestion() {
+    class GalleryPageUrlSuggestion(gid: Long, pToken: String, page: Int) : UrlSuggestion() {
         override val destination = ProgressScreenDestination(gid, pToken, page)
     }
-
-    var expanded by remember { mutableStateOf(false) }
 
     val selectImageFirst = stringResource(R.string.select_image_first)
     SearchBarScreen(
@@ -539,7 +525,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
         searchFieldState = searchFieldState,
         searchFieldHint = searchBarHint,
         showSearchFab = showSearchLayout,
-        onApplySearch = { query ->
+        onApplySearch = ret@{ query ->
             val builder = ListUrlBuilder()
             val oldMode = urlBuilder.mode
             if (!showSearchLayout) {
@@ -553,24 +539,18 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 builder.pageFrom = advancedSearchOption.fromPage
                 builder.pageTo = advancedSearchOption.toPage
             } else {
-                builder.mode = MODE_IMAGE_SEARCH
-                if (imagePath.isBlank()) {
-                    activity.showTip(selectImageFirst)
-                    return@SearchBarScreen
+                if (imageUri == null) {
+                    snackbarState.showSnackbar(selectImageFirst)
+                    return@ret
                 }
-                val uri = Uri.parse(imagePath)
-                val temp = AppConfig.createTempFile() ?: return@SearchBarScreen
-                val bitmap = context.decodeBitmap(uri) ?: return@SearchBarScreen
-                temp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                builder.imagePath = temp.path
-                builder.isUseSimilarityScan = useSimilarityScan
-                builder.isOnlySearchCovers = searchCoverOnly
+                builder.mode = MODE_IMAGE_SEARCH
+                builder.hash = imageUri!!.asUniFile().sha1() ?: return@ret
             }
             when (oldMode) {
                 MODE_TOPLIST, MODE_WHATS_HOT -> {
                     // Wait for search view to hide
                     delay(300)
-                    withUIContext { navigator.navigate(GalleryListScreenDestination(builder)) }
+                    withUIContext { navigator.navigate(builder.asDst()) }
                 }
                 else -> {
                     urlBuilder = builder
@@ -579,8 +559,8 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             }
             showSearchLayout = false
         },
-        onSearchExpanded = { hidden = true },
-        onSearchHidden = { hidden = false },
+        onSearchExpanded = { fabHidden = true },
+        onSearchHidden = { fabHidden = false },
         refreshState = refreshState,
         suggestionProvider = {
             GalleryDetailUrlParser.parse(it, false)?.run {
@@ -650,17 +630,12 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                     ImageSearch(
-                        imagePath = imagePath,
+                        image = imageUri,
                         onSelectImage = {
                             coroutineScope.launch {
-                                val image = context.pickVisualMedia(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                if (image != null) imagePath = image.toString()
+                                imageUri = context.pickVisualMedia(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             }
                         },
-                        uss = useSimilarityScan,
-                        onUssChecked = { useSimilarityScan = it },
-                        osc = searchCoverOnly,
-                        onOscChecked = { searchCoverOnly = it },
                     )
                 }
             }
@@ -675,9 +650,9 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                     val dy = -consumed.y
                     if (dy >= slop) {
-                        hidden = true
+                        fabHidden = true
                     } else if (dy <= -slop / 2) {
-                        hidden = false
+                        fabHidden = false
                     }
                     searchBarOffsetY = (searchBarOffsetY - dy).roundToInt().coerceIn(-topPaddingPx, 0)
                     return Offset.Zero // We never consume it
@@ -698,7 +673,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             detailItemContent = { info ->
                 GalleryInfoListItem(
                     onClick = {
-                        navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
+                        navigator.navigate(info.asDst())
                     },
                     onLongClick = {
                         coroutineScope.launch {
@@ -715,7 +690,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             thumbItemContent = { info ->
                 GalleryInfoGridItem(
                     onClick = {
-                        navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
+                        navigator.navigate(info.asDst())
                     },
                     onLongClick = {
                         coroutineScope.launch {
@@ -727,7 +702,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             },
             refreshState = refreshState,
             onRefresh = {
-                urlBuilder.setIndex(null)
+                urlBuilder.setRange(0)
                 data.refresh()
             },
             onLoading = { searchBarOffsetY = 0 },
@@ -738,22 +713,30 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
     val invalidNum = stringResource(R.string.error_invalid_number)
     val outOfRange = stringResource(R.string.error_out_of_range)
 
-    val hideFab by remember {
-        snapshotFlow {
-            hidden || showSearchLayout
-        }.onEach {
-            if (!it) delay(FAB_ANIMATE_TIME.toLong())
-        }.mapLatest { it }
-    }.collectAsState(hidden || showSearchLayout)
+    val hideFab by delegateSnapshotUpdate {
+        record { fabHidden || showSearchLayout }
+        transform {
+            // Bug: IDE failed to inference 'hide's type
+            onEachLatest { hide: Boolean ->
+                if (!hide) delay(FAB_ANIMATE_TIME.toLong())
+            }
+        }
+    }
 
     FabLayout(
         hidden = hideFab,
-        expanded = expanded,
-        onExpandChanged = { expanded = it },
+        expanded = fabExpanded,
+        onExpandChanged = { fabExpanded = it },
         autoCancel = true,
     ) {
+        if (urlBuilder.mode in arrayOf(MODE_NORMAL, MODE_UPLOADER, MODE_TAG)) {
+            onClick(Icons.Default.Shuffle) {
+                urlBuilder.setRange(Random.nextInt(100))
+                data.refresh()
+            }
+        }
         onClick(Icons.Default.Refresh) {
-            urlBuilder.setIndex(null)
+            urlBuilder.setRange(0)
             data.refresh()
         }
         if (urlBuilder.mode != MODE_WHATS_HOT) {
@@ -782,7 +765,7 @@ fun GalleryListScreen(lub: ListUrlBuilder, navigator: DestinationsNavigator) {
             }
             onClick(Icons.AutoMirrored.Default.LastPage) {
                 if (isTopList) {
-                    urlBuilder.mJumpTo = "${TOPLIST_PAGES - 1}"
+                    urlBuilder.setJumpTo(TOPLIST_PAGES - 1)
                     data.refresh()
                 } else {
                     urlBuilder.setIndex("1", false)

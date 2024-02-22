@@ -38,6 +38,7 @@ import com.hippo.unifile.UniFile
 import com.hippo.unifile.asUniFile
 import com.hippo.unifile.openOutputStream
 import eu.kanade.tachiyomi.util.lang.withNonCancellableContext
+import eu.kanade.tachiyomi.util.system.logcat
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
@@ -89,7 +90,7 @@ class SpiderDen(val info: GalleryInfo) {
                 true
             } ?: false
         }.onFailure {
-            it.printStackTrace()
+            logcat(it)
         }.getOrDefault(false)
     }
 
@@ -187,7 +188,7 @@ class SpiderDen(val info: GalleryInfo) {
                 data.asUniFile() sendTo file
                 return true
             }.onFailure {
-                it.printStackTrace()
+                logcat(it)
                 return false
             }
         }
@@ -197,7 +198,7 @@ class SpiderDen(val info: GalleryInfo) {
             runCatching {
                 requireNotNull(findImageFile(uniFile, index)) sendTo file
             }.onFailure {
-                it.printStackTrace()
+                logcat(it)
                 return false
             }.onSuccess {
                 return true
@@ -260,6 +261,11 @@ class SpiderDen(val info: GalleryInfo) {
         downloadDir = getGalleryDownloadDir(gid)?.takeIf { it.isDirectory }
     }
 
+    suspend fun initDownloadDir() {
+        downloadDir = getGalleryDownloadDir(gid) ?: (downloadLocation / info.putToDownloadDir())
+        check(downloadDir!!.ensureDir())
+    }
+
     suspend fun writeComicInfo(fetchMetadata: Boolean = true) {
         downloadDir?.run {
             createFile(COMIC_INFO_FILE)?.also {
@@ -271,7 +277,7 @@ class SpiderDen(val info: GalleryInfo) {
                     }
                     info.getComicInfo().write(it)
                 }.onFailure {
-                    it.printStackTrace()
+                    logcat(it)
                 }
             }
         }

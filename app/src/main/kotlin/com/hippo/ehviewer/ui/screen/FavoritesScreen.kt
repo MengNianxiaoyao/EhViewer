@@ -1,5 +1,6 @@
 package com.hippo.ehviewer.ui.screen
 
+import android.view.ViewConfiguration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -9,7 +10,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text2.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.FolderSpecial
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -66,9 +67,9 @@ import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.filled.GoTo
 import com.hippo.ehviewer.ui.LocalSideSheetState
+import com.hippo.ehviewer.ui.LocalSnackBarHostState
 import com.hippo.ehviewer.ui.LockDrawer
 import com.hippo.ehviewer.ui.MainActivity
-import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
 import com.hippo.ehviewer.ui.main.FAB_ANIMATE_TIME
 import com.hippo.ehviewer.ui.main.FabLayout
 import com.hippo.ehviewer.ui.main.GalleryInfoGridItem
@@ -77,6 +78,8 @@ import com.hippo.ehviewer.ui.main.GalleryList
 import com.hippo.ehviewer.ui.showDatePicker
 import com.hippo.ehviewer.ui.startDownload
 import com.hippo.ehviewer.ui.tools.LocalDialogState
+import com.hippo.ehviewer.ui.tools.delegateSnapshotUpdate
+import com.hippo.ehviewer.ui.tools.foldToLoadResult
 import com.hippo.ehviewer.ui.tools.rememberInVM
 import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.findActivity
@@ -84,25 +87,28 @@ import com.hippo.ehviewer.util.mapToLongArray
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.withIOContext
+import eu.kanade.tachiyomi.util.lang.withUIContext
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import moe.tarsin.coroutines.onEachLatest
 import moe.tarsin.coroutines.runSuspendCatching
 
 @Destination
 @Composable
 fun FavouritesScreen(navigator: DestinationsNavigator) {
+    // Immutables
+    val localFavName = stringResource(R.string.local_favorites)
+    val cloudFavName = stringResource(R.string.cloud_favorites)
+
     // Meta State
     var urlBuilder by rememberSaveable { mutableStateOf(FavListUrlBuilder(favCat = Settings.recentFavCat)) }
     var searchBarOffsetY by remember { mutableIntStateOf(0) }
 
     // Derived State
-    val keyword = remember(urlBuilder) { urlBuilder.keyword.orEmpty() }
-    val localFavName = stringResource(R.string.local_favorites)
-    val cloudFavName = stringResource(R.string.cloud_favorites)
+    val keyword = urlBuilder.keyword
+    val isLocalFav = urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL
     val favCatName = remember(urlBuilder) {
         when (val favCat = urlBuilder.favCat) {
             in 0..9 -> Settings.favCat[favCat]
@@ -110,18 +116,21 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
             else -> cloudFavName
         }
     }
-    val favTitle = stringResource(R.string.favorites_title, favCatName)
-    val favTitleWithKeyword = stringResource(R.string.favorites_title_2, favCatName, keyword)
-    val title = remember(urlBuilder) { if (keyword.isBlank()) favTitle else favTitleWithKeyword }
+    val title = if (keyword.isNullOrBlank()) {
+        stringResource(R.string.favorites_title, favCatName)
+    } else {
+        stringResource(R.string.favorites_title_2, favCatName, keyword)
+    }
     val context = LocalContext.current
     val density = LocalDensity.current
+    val snackbarState = LocalSnackBarHostState.current
     val dialogState = LocalDialogState.current
     val activity = remember(context) { context.findActivity<MainActivity>() }
     val coroutineScope = rememberCoroutineScope()
     val localFavCountFlow = rememberInVM { EhDB.localFavCount }
     val searchBarHint = stringResource(R.string.search_bar_hint, favCatName)
-    val data = rememberInVM(urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
-        if (urlBuilder.favCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
+    val data = rememberInVM(isLocalFav) {
+        if (isLocalFav) {
             Pager(PagingConfig(20, jumpThreshold = 40)) {
                 val keywordNow = urlBuilder.keyword.orEmpty()
                 if (keywordNow.isBlank()) {
@@ -149,16 +158,15 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                                 }
                             }
                         }
-                        val r = runSuspendCatching {
+                        runSuspendCatching {
                             EhEngine.getFavorites(urlBuilder.build())
-                        }.onFailure {
-                            return@withIOContext LoadResult.Error(it)
-                        }.getOrThrow()
-                        Settings.favCat = r.catArray.toTypedArray()
-                        Settings.favCount = r.countArray.toIntArray()
-                        Settings.favCloudCount = r.countArray.sum()
-                        urlBuilder.jumpTo = null
-                        LoadResult.Page(r.galleryInfoList, r.prev, r.next)
+                        }.foldToLoadResult { result ->
+                            Settings.favCat = result.catArray.toTypedArray()
+                            Settings.favCount = result.countArray.toIntArray()
+                            Settings.favCloudCount = result.countArray.sum()
+                            urlBuilder.jumpTo = null
+                            LoadResult.Page(result.galleryInfoList, result.prev, result.next)
+                        }
                     }
                 }
             }
@@ -219,8 +227,8 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         data.loadState.refresh is LoadState.NotLoading
     }
 
-    var expanded by remember { mutableStateOf(false) }
-    var hidden by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
+    var fabHidden by remember { mutableStateOf(false) }
     val checkedInfoMap = remember { mutableStateMapOf<Long, BaseGalleryInfo>() }
     val selectMode = checkedInfoMap.isNotEmpty()
     LockDrawer(selectMode)
@@ -232,9 +240,9 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         onApplySearch = { refresh(FavListUrlBuilder(urlBuilder.favCat, it)) },
         onSearchExpanded = {
             checkedInfoMap.clear()
-            hidden = true
+            fabHidden = true
         },
-        onSearchHidden = { hidden = false },
+        onSearchHidden = { fabHidden = false },
         refreshState = refreshState,
         searchBarOffsetY = { searchBarOffsetY },
         trailingIcon = {
@@ -248,10 +256,17 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         val height by collectListThumbSizeAsState()
         val showPages = Settings.showGalleryPages
         val searchBarConnection = remember {
+            val slop = ViewConfiguration.get(context).scaledTouchSlop
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             object : NestedScrollConnection {
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                    searchBarOffsetY = (searchBarOffsetY + consumed.y).roundToInt().coerceIn(-topPaddingPx, 0)
+                    val dy = -consumed.y
+                    if (dy >= slop) {
+                        fabHidden = true
+                    } else if (dy <= -slop / 2) {
+                        fabHidden = false
+                    }
+                    searchBarOffsetY = (searchBarOffsetY - dy).roundToInt().coerceIn(-topPaddingPx, 0)
                     return Offset.Zero // We never consume it
                 }
             }
@@ -263,7 +278,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
             listMode = listMode,
             detailItemContent = { info ->
                 val checked = info.gid in checkedInfoMap
-                CheckableItem(checked = checked) {
+                CheckableItem(checked = checked, modifier = Modifier.animateItemPlacement()) { interactionSource ->
                     GalleryInfoListItem(
                         onClick = {
                             if (selectMode) {
@@ -273,7 +288,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                                     checkedInfoMap[info.gid] = info
                                 }
                             } else {
-                                navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
+                                navigator.navigate(info.asDst())
                             }
                         },
                         onLongClick = {
@@ -283,12 +298,13 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                         isInFavScene = true,
                         showPages = showPages,
                         modifier = Modifier.height(height),
+                        interactionSource = interactionSource,
                     )
                 }
             },
             thumbItemContent = { info ->
                 val checked = info.gid in checkedInfoMap
-                CheckableItem(checked = checked) {
+                CheckableItem(checked = checked, modifier = Modifier.animateItemPlacement()) { interactionSource ->
                     GalleryInfoGridItem(
                         onClick = {
                             if (selectMode) {
@@ -298,13 +314,14 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                                     checkedInfoMap[info.gid] = info
                                 }
                             } else {
-                                navigator.navigate(GalleryDetailScreenDestination(GalleryInfoArgs(info)))
+                                navigator.navigate(info.asDst())
                             }
                         },
                         onLongClick = {
                             checkedInfoMap[info.gid] = info
                         },
                         info = info,
+                        interactionSource = interactionSource,
                     )
                 }
             },
@@ -315,24 +332,34 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
         )
     }
 
-    val hideFab by remember {
-        snapshotFlow {
-            hidden
-        }.onEach {
-            if (!it) delay(FAB_ANIMATE_TIME.toLong())
-        }.mapLatest { it }
-    }.collectAsState(hidden)
+    val hideFab by delegateSnapshotUpdate {
+        record { fabHidden }
+        transform {
+            // Bug: IDE failed to inference 'hide's type
+            onEachLatest { hide: Boolean ->
+                if (!hide) delay(FAB_ANIMATE_TIME.toLong())
+            }
+        }
+    }
 
     FabLayout(
-        hidden = hideFab,
-        expanded = expanded || selectMode,
+        hidden = hideFab && !selectMode,
+        expanded = fabExpanded || selectMode,
         onExpandChanged = {
-            expanded = it
+            fabExpanded = it
             checkedInfoMap.clear()
         },
         autoCancel = !selectMode,
     ) {
         if (!selectMode) {
+            if (isLocalFav) {
+                onClick(Icons.Default.Shuffle) {
+                    val random = EhDB.randomLocalFav()
+                    withUIContext {
+                        navigator.navigate(random.asDst())
+                    }
+                }
+            }
             onClick(EhIcons.Default.GoTo) {
                 coroutineScope.launch {
                     val date = dialogState.showDatePicker()
@@ -385,7 +412,7 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                     runSuspendCatching {
                         if (srcCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
                             // Move from local to cloud
-                            val galleryList = info.map { it.gid to it.token!! }
+                            val galleryList = info.map { it.gid to it.token }
                             EhEngine.addFavorites(galleryList, dstCat)
                             EhDB.removeLocalFavorites(info)
                         } else if (dstCat == FavListUrlBuilder.FAV_CAT_LOCAL) {
@@ -396,10 +423,11 @@ fun FavouritesScreen(navigator: DestinationsNavigator) {
                             val gidArray = info.mapToLongArray(BaseGalleryInfo::gid)
                             EhEngine.modifyFavorites(gidArray, srcCat, dstCat)
                         }
+                    }.onSuccess {
+                        data.refresh()
                     }.onFailure {
-                        activity.showTip(ExceptionUtils.getReadableString(it))
+                        snackbarState.showSnackbar(ExceptionUtils.getReadableString(it))
                     }
-                    data.refresh()
                 }
             }
         }

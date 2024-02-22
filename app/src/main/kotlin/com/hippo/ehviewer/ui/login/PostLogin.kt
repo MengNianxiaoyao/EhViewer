@@ -4,6 +4,7 @@ import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhEngine
 import com.hippo.ehviewer.client.EhUrl
+import eu.kanade.tachiyomi.util.system.logcat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -15,12 +16,13 @@ suspend fun postLogin() = coroutineScope {
                 Settings.avatar = avatar
             }
         }.onFailure {
-            it.printStackTrace()
+            logcat(it)
         }
     }
     runCatching {
         // For the `star` cookie
         EhEngine.getNews(false)
+        EhCookieStore.copyNecessaryCookies()
 
         // Get cookies for image limits
         launch {
@@ -28,7 +30,7 @@ suspend fun postLogin() = coroutineScope {
                 EhEngine.getUConfig(EhUrl.URL_UCONFIG_E)
                 EhCookieStore.flush()
             }.onFailure {
-                it.printStackTrace()
+                logcat(it)
             }
         }
 
@@ -39,6 +41,6 @@ suspend fun postLogin() = coroutineScope {
         EhCookieStore.flush()
     }.onFailure {
         Settings.gallerySite = EhUrl.SITE_E
-    }
-    Settings.needSignIn = false
+        Settings.needSignIn = false
+    }.isSuccess
 }

@@ -1,6 +1,7 @@
 package com.hippo.ehviewer.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,7 @@ import androidx.compose.material3.ShapeDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -35,27 +37,25 @@ import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.dao.DownloadInfo
 import com.hippo.ehviewer.download.DownloadManager
 import com.hippo.ehviewer.ui.tools.CrystalCard
-import com.hippo.ehviewer.ui.tools.DragHandle
 import com.hippo.ehviewer.ui.tools.GalleryListCardRating
 import com.hippo.ehviewer.util.FileUtils
-import sh.calvin.reorderable.ReorderableItemScope
 
 @Composable
-fun ReorderableItemScope.DownloadCard(
+fun DownloadCard(
     onClick: () -> Unit,
     onThumbClick: () -> Unit,
     onLongClick: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onDragStarted: () -> Unit,
-    onDragStopped: () -> Unit,
     info: DownloadInfo,
     modifier: Modifier = Modifier,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     CrystalCard(
         modifier = modifier,
         onClick = onClick,
         onLongClick = onLongClick,
+        interactionSource = interactionSource,
     ) {
         Row {
             Card(onClick = onThumbClick) {
@@ -165,7 +165,6 @@ fun ReorderableItemScope.DownloadCard(
                         bottom.linkTo(parent.bottom)
                     },
                 ) {
-                    DragHandle(onDragStarted = onDragStarted, onDragStopped = onDragStopped)
                     if (downloadState == DownloadInfo.STATE_WAIT || downloadState == DownloadInfo.STATE_DOWNLOAD) {
                         IconButton(onClick = onStop) {
                             Icon(imageVector = Icons.Default.Pause, contentDescription = null)

@@ -20,7 +20,6 @@ import android.app.assist.AssistContent
 import android.content.Intent
 import android.content.pm.verify.domain.DomainVerificationManager
 import android.content.pm.verify.domain.DomainVerificationUserState.DOMAIN_STATE_NONE
-import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -30,6 +29,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -74,6 +74,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.currentCompositeKeyHash
 import androidx.compose.runtime.getValue
@@ -86,10 +87,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -97,6 +101,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.data.ListUrlBuilder
 import com.hippo.ehviewer.client.parser.GalleryDetailUrlParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
@@ -105,22 +110,21 @@ import com.hippo.ehviewer.download.DownloadService
 import com.hippo.ehviewer.download.downloadLocation
 import com.hippo.ehviewer.icons.EhIcons
 import com.hippo.ehviewer.icons.filled.Subscriptions
-import com.hippo.ehviewer.image.Image.Companion.decodeBitmap
 import com.hippo.ehviewer.ui.destinations.DownloadScreenDestination
 import com.hippo.ehviewer.ui.destinations.DownloadsScreenDestination
 import com.hippo.ehviewer.ui.destinations.FavouritesScreenDestination
-import com.hippo.ehviewer.ui.destinations.GalleryDetailScreenDestination
-import com.hippo.ehviewer.ui.destinations.GalleryListScreenDestination
 import com.hippo.ehviewer.ui.destinations.HistoryScreenDestination
 import com.hippo.ehviewer.ui.destinations.HomePageScreenDestination
 import com.hippo.ehviewer.ui.destinations.ProgressScreenDestination
+import com.hippo.ehviewer.ui.destinations.SelectSiteScreenDestination
 import com.hippo.ehviewer.ui.destinations.SettingsScreenDestination
 import com.hippo.ehviewer.ui.destinations.SignInScreenDestination
 import com.hippo.ehviewer.ui.destinations.SubscriptionScreenDestination
 import com.hippo.ehviewer.ui.destinations.ToplistScreenDestination
 import com.hippo.ehviewer.ui.destinations.WhatshotScreenDestination
 import com.hippo.ehviewer.ui.legacy.EditTextDialogBuilder
-import com.hippo.ehviewer.ui.screen.TokenArgs
+import com.hippo.ehviewer.ui.screen.asDst
+import com.hippo.ehviewer.ui.screen.asDstWith
 import com.hippo.ehviewer.ui.screen.navWithUrl
 import com.hippo.ehviewer.ui.screen.navigate
 import com.hippo.ehviewer.ui.settings.showNewVersion
@@ -130,19 +134,18 @@ import com.hippo.ehviewer.ui.tools.LocalDialogState
 import com.hippo.ehviewer.ui.tools.LocalTouchSlopProvider
 import com.hippo.ehviewer.ui.tools.LocalWindowSizeClass
 import com.hippo.ehviewer.updater.AppUpdater
-import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.ExceptionUtils
 import com.hippo.ehviewer.util.addTextToClipboard
 import com.hippo.ehviewer.util.getParcelableExtraCompat
 import com.hippo.ehviewer.util.getUrlFromClipboard
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.isAtLeastS
+import com.hippo.unifile.asUniFile
+import com.hippo.unifile.sha1
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.rememberNavHostEngine
 import com.ramcosta.composedestinations.utils.currentDestinationAsState
 import eu.kanade.tachiyomi.util.lang.withIOContext
-import java.io.File
-import java.io.FileOutputStream
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -195,20 +198,6 @@ class MainActivity : EhActivity() {
         }
     }
 
-    private fun saveImageToTempFile(uri: Uri): File? {
-        val bitmap = runCatching {
-            decodeBitmap(uri)
-        }.getOrNull() ?: return null
-        val temp = AppConfig.createTempFile() ?: return null
-        return runCatching {
-            FileOutputStream(temp).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-            temp
-        }.getOrElse {
-            it.printStackTrace()
-            null
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intentChannel.trySend(intent)
@@ -230,6 +219,7 @@ class MainActivity : EhActivity() {
             val dialogState = LocalDialogState.current
             val navDrawerState = rememberDrawerState(DrawerValue.Closed)
             val sideSheetState = rememberDrawerState(DrawerValue.Closed)
+            val snackbarState = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
             val navController = rememberNavController()
             fun closeDrawer(callback: () -> Unit = {}) = scope.launch {
@@ -264,7 +254,7 @@ class MainActivity : EhActivity() {
                         }
                     }
                 }.onFailure {
-                    showTip(getString(R.string.update_failed, ExceptionUtils.getReadableString(it)))
+                    snackbarState.showSnackbar(getString(R.string.update_failed, ExceptionUtils.getReadableString(it)))
                 }
             }
 
@@ -287,18 +277,19 @@ class MainActivity : EhActivity() {
                             val type = intent.type
                             if ("text/plain" == type) {
                                 val keyword = intent.getStringExtra(Intent.EXTRA_TEXT)
-                                navController.navigate(GalleryListScreenDestination(ListUrlBuilder(mKeyword = keyword)))
+                                if (keyword != null && !navController.navWithUrl(keyword)) {
+                                    navController.navigate(ListUrlBuilder(mKeyword = keyword).asDst())
+                                }
                             } else if (type != null && type.startsWith("image/")) {
                                 val uri = intent.getParcelableExtraCompat<Uri>(Intent.EXTRA_STREAM)
                                 if (null != uri) {
-                                    val temp = saveImageToTempFile(uri)
-                                    if (null != temp) {
-                                        val builder = ListUrlBuilder(
-                                            mode = ListUrlBuilder.MODE_IMAGE_SEARCH,
-                                            imagePath = temp.path,
-                                            isUseSimilarityScan = true,
+                                    withIOContext { uri.asUniFile().sha1() }?.let {
+                                        navController.navigate(
+                                            ListUrlBuilder(
+                                                mode = ListUrlBuilder.MODE_IMAGE_SEARCH,
+                                                hash = it,
+                                            ).asDst(),
                                         )
-                                        navController.navigate(GalleryListScreenDestination(builder))
                                     }
                                 }
                             }
@@ -311,7 +302,6 @@ class MainActivity : EhActivity() {
                 }
             }
 
-            val snackbarState = remember { SnackbarHostState() }
             LaunchedEffect(Unit) {
                 tipFlow.collectLatest {
                     snackbarState.showSnackbar(it)
@@ -346,7 +336,7 @@ class MainActivity : EhActivity() {
                         val result1 = GalleryDetailUrlParser.parse(text, false)
                         var launch: (() -> Unit)? = null
                         if (result1 != null) {
-                            launch = { navController.navigate(GalleryDetailScreenDestination(TokenArgs(result1.gid, result1.token))) }
+                            launch = { navController.navigate(result1.gid asDstWith result1.token) }
                         }
                         val result2 = GalleryPageUrlParser.parse(text, false)
                         if (result2 != null) {
@@ -363,15 +353,29 @@ class MainActivity : EhActivity() {
             }
             val currentDestination by navController.currentDestinationAsState()
             val lockDrawerHandle = remember { mutableStateListOf<Int>() }
+            var snackbarFabPadding by remember { mutableStateOf(0.dp) }
             val drawerLocked = lockDrawerHandle.isNotEmpty()
             val viewConfiguration = LocalViewConfiguration.current
+            val density = LocalDensity.current
             CompositionLocalProvider(
                 LocalNavDrawerState provides navDrawerState,
                 LocalSideSheetState provides sideSheetState,
                 LocalDrawerLockHandle provides lockDrawerHandle,
-                LocalSnackbarHostState provides snackbarState,
+                LocalSnackBarHostState provides snackbarState,
+                LocalSnackBarFabPadding provides animateDpAsState(snackbarFabPadding, label = "SnackbarFabPadding"),
             ) {
-                Scaffold(snackbarHost = { SnackbarHost(snackbarState) }) {
+                Scaffold(
+                    snackbarHost = {
+                        SnackbarHost(
+                            hostState = snackbarState,
+                            modifier = Modifier.onGloballyPositioned {
+                                with(density) {
+                                    snackbarFabPadding = it.size.height.toDp()
+                                }
+                            },
+                        )
+                    },
+                ) {
                     LocalTouchSlopProvider(Settings.touchSlopFactor.toFloat()) {
                         ModalNavigationDrawer(
                             drawerContent = {
@@ -438,7 +442,7 @@ class MainActivity : EhActivity() {
                                     DestinationsNavHost(
                                         navGraph = NavGraphs.root,
                                         startRoute = if (Settings.needSignIn) {
-                                            SignInScreenDestination
+                                            if (EhCookieStore.hasSignedIn()) SelectSiteScreenDestination else SignInScreenDestination
                                         } else {
                                             StartDestination
                                         },
@@ -524,11 +528,8 @@ class MainActivity : EhActivity() {
     }
 
     fun showTip(@StringRes id: Int, useToast: Boolean = false) {
-        showTip(getString(id), useToast)
-    }
-
-    fun showTip(message: CharSequence, useToast: Boolean = false) {
-        if (useToast || !tipFlow.tryEmit(message.toString())) {
+        val message = getString(id)
+        if (useToast || !tipFlow.tryEmit(message)) {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
@@ -562,8 +563,9 @@ class MainActivity : EhActivity() {
 
 val LocalNavDrawerState = compositionLocalOf<DrawerState2> { error("CompositionLocal LocalNavDrawerState not present!") }
 val LocalSideSheetState = compositionLocalOf<DrawerState2> { error("CompositionLocal LocalSideSheetState not present!") }
-val LocalDrawerLockHandle = compositionLocalOf<SnapshotStateList<Int>> { error("CompositionLocal LocalSideSheetState not present!") }
-val LocalSnackbarHostState = compositionLocalOf<SnackbarHostState> { error("CompositionLocal LocalSnackbarHostState not present!") }
+val LocalDrawerLockHandle = compositionLocalOf<SnapshotStateList<Int>> { error("CompositionLocal LocalDrawerLockHandle not present!") }
+val LocalSnackBarHostState = compositionLocalOf<SnackbarHostState> { error("CompositionLocal LocalSnackBarHostState not present!") }
+val LocalSnackBarFabPadding = compositionLocalOf<State<Dp>> { error("CompositionLocal LocalSnackBarFabPadding not present!") }
 
 @Composable
 fun LockDrawer(value: Boolean) {
