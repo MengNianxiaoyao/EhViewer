@@ -172,7 +172,7 @@ object Settings : DataStorePreferences(null) {
     var defaultDownloadLabel by stringOrNullPref("default_download_label", null)
     var displayName by stringOrNullPref("display_name", null)
     var avatar by stringOrNullPref("avatar", null)
-    var dohUrl by stringPref("doh_url", "https://77.88.8.8/dns-query")
+    var dohUrl by stringPref("doh_url", "https://common.dot.dns.yandex.net/dns-query")
     var language by stringPref("app_language", "system").observed { updateWhenLocaleChanges() }
     var cloudflareIp by stringOrNullPref("cloudflare_ip", "cdn.sstatic.net")
     var cloudflareIpOverride by boolPref("cloudflare_ip_override", false)
