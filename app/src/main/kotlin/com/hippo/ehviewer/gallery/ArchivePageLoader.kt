@@ -55,7 +55,7 @@ class ArchivePageLoader(
     private val hostJob = launch(start = CoroutineStart.LAZY) {
         logcat(DEBUG_TAG) { "Open archive ${file.uri.displayPath}" }
         pfd = file.openFileDescriptor("r")
-        size = openArchive(pfd.fd, pfd.statSize)
+        size = openArchive(pfd.fd, pfd.statSize, gid == 0L)
         if (size == 0) {
             return@launch
         }
@@ -104,8 +104,7 @@ class ArchivePageLoader(
     }
 
     private suspend fun doRealWork(index: Int) {
-        val buffer = extractToByteBuffer(index)
-        buffer ?: return
+        val buffer = extractToByteBuffer(index) ?: return notifyPageFailed(index, null)
         check(buffer.isDirect)
         val src = object : ByteBufferSource {
             override val source: ByteBuffer = buffer

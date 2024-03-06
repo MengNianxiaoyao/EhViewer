@@ -53,6 +53,7 @@ import com.hippo.ehviewer.download.DownloadManager
 import com.hippo.ehviewer.download.DownloadService
 import com.hippo.ehviewer.download.downloadDir
 import com.hippo.ehviewer.download.downloadLocation
+import com.hippo.ehviewer.ui.destinations.ReaderScreenDestination
 import com.hippo.ehviewer.ui.tools.DialogState
 import com.hippo.ehviewer.ui.tools.LabeledCheckbox
 import com.hippo.ehviewer.util.FavouriteStatusRouter
@@ -61,7 +62,9 @@ import com.hippo.ehviewer.util.isAtLeastT
 import com.hippo.ehviewer.util.mapToLongArray
 import com.hippo.ehviewer.util.requestPermission
 import com.hippo.ehviewer.util.toEpochMillis
+import com.hippo.ehviewer.util.toLocalDateTime
 import com.hippo.unifile.UniFile
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.util.lang.withIOContext
 import eu.kanade.tachiyomi.util.lang.withUIContext
@@ -72,7 +75,6 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import moe.tarsin.coroutines.runSuspendCatching
 import splitties.init.appCtx
@@ -270,15 +272,24 @@ suspend fun removeFromFavorites(galleryInfo: BaseGalleryInfo) = doModifyFavorite
     localFavorited = EhDB.containLocalFavorites(galleryInfo.gid),
 )
 
-fun Context.navToReader(info: BaseGalleryInfo, page: Int = -1) {
-    val intent = Intent(this, ReaderActivity::class.java)
-    intent.action = ReaderActivity.ACTION_EH
-    intent.putExtra(ReaderActivity.KEY_GALLERY_INFO, info)
-    intent.putExtra(ReaderActivity.KEY_PAGE, page)
-    startActivity(intent)
+context (Context, DestinationsNavigator)
+fun navToReader(
+    info: BaseGalleryInfo,
+    page: Int = -1,
+) {
+    if (Settings.newReader) {
+        navigate(ReaderScreenDestination(info, page))
+    } else {
+        val intent = Intent(this@Context, ReaderActivity::class.java)
+        intent.action = ReaderActivity.ACTION_EH
+        intent.putExtra(ReaderActivity.KEY_GALLERY_INFO, info)
+        intent.putExtra(ReaderActivity.KEY_PAGE, page)
+        startActivity(intent)
+    }
 }
 
-suspend fun DialogState.doGalleryInfoAction(info: BaseGalleryInfo, context: Context) {
+context(DialogState, Context, DestinationsNavigator)
+suspend fun doGalleryInfoAction(info: BaseGalleryInfo) {
     val downloaded = DownloadManager.getDownloadState(info.gid) != DownloadInfo.STATE_INVALID
     val favorited = info.favoriteSlot != NOT_FAVORITED
     val items = buildList {
@@ -300,14 +311,14 @@ suspend fun DialogState.doGalleryInfoAction(info: BaseGalleryInfo, context: Cont
         }
     }
     val selected = showSelectItemWithIcon(items, EhUtils.getSuitableTitle(info))
-    with(context.findActivity<MainActivity>()) {
+    with(findActivity<MainActivity>()) {
         when (selected) {
             0 -> navToReader(info)
             1 -> withUIContext {
                 if (downloaded) {
                     confirmRemoveDownload(info)
                 } else {
-                    startDownload(context, false, info)
+                    startDownload(this@with, false, info)
                 }
             }
 
@@ -428,8 +439,6 @@ suspend fun DialogState.showDatePicker(): String? {
             }
         },
     )
-    val date = dateMillis?.let {
-        kotlinx.datetime.Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date.toString()
-    }
+    val date = dateMillis?.run { toLocalDateTime().date.toString() }
     return date
 }

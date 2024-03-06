@@ -1,8 +1,9 @@
 package com.hippo.ehviewer.spider
 
-import com.hippo.ehviewer.client.EhTagDatabase
 import com.hippo.ehviewer.client.EhUrl
+import com.hippo.ehviewer.client.data.GalleryDetail
 import com.hippo.ehviewer.client.data.GalleryInfo
+import com.hippo.ehviewer.client.data.TagNamespace
 import com.hippo.unifile.UniFile
 import com.hippo.unifile.openInputStream
 import com.hippo.unifile.openOutputStream
@@ -18,6 +19,7 @@ import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.xmlStreaming
 
 const val COMIC_INFO_FILE = "ComicInfo.xml"
+private const val TAG_ORIGINAL = "original"
 
 private val xml = XML {
     recommended {
@@ -33,16 +35,36 @@ fun GalleryInfo.getComicInfo(): ComicInfo {
     val groups = mutableListOf<String>()
     val characters = mutableListOf<String>()
     val parodies = mutableListOf<String>()
-    val tags = mutableListOf<String>()
-    simpleTags?.forEach {
-        val (namespace, tag) = it.split(':', limit = 2)
-        when (namespace) {
-            "artist", "cosplayer" -> artists.add(tag)
-            "group" -> groups.add(tag)
-            "character" -> characters.add(tag)
-            "parody" -> if (tag != "original") parodies.add(tag)
-            "language", "reclass" -> Unit
-            else -> tags.add("${EhTagDatabase.namespaceToPrefix(namespace)}:$tag")
+    val otherTags = mutableListOf<String>()
+    with(TagNamespace) {
+        when (this@getComicInfo) {
+            is GalleryDetail -> tags.forEach { tagList ->
+                when (val ns = TagNamespace(tagList.groupName)) {
+                    Artist, Cosplayer -> artists.addAll(tagList)
+                    Group -> groups.addAll(tagList)
+                    Character -> characters.addAll(tagList)
+                    Parody -> tagList.forEach { tag -> if (tag != TAG_ORIGINAL) parodies.add(tag) }
+                    Other -> otherTags.addAll(tagList)
+                    Female, Male, Mixed -> ns.toPrefix()?.let { prefix ->
+                        tagList.forEach { tag -> otherTags.add("$prefix:$tag") }
+                    }
+
+                    else -> Unit
+                }
+            }
+
+            else -> simpleTags?.forEach { tagString ->
+                val (namespace, tag) = tagString.split(':', limit = 2)
+                when (val ns = TagNamespace(namespace)) {
+                    Artist, Cosplayer -> artists.add(tag)
+                    Group -> groups.add(tag)
+                    Character -> characters.add(tag)
+                    Parody -> if (tag != TAG_ORIGINAL) parodies.add(tag)
+                    Other -> otherTags.add(tag)
+                    Female, Male, Mixed -> ns.toPrefix()?.let { otherTags.add("$it:$tag") }
+                    else -> Unit
+                }
+            }
         }
     }
     return ComicInfo(
@@ -50,7 +72,7 @@ fun GalleryInfo.getComicInfo(): ComicInfo {
         alternateSeries = titleJpn.takeUnless { it.isNullOrBlank() },
         writer = groups.takeUnless { it.isEmpty() }?.joinToString(),
         penciller = artists.takeUnless { it.isEmpty() }?.joinToString(),
-        genre = tags.takeUnless { it.isEmpty() }?.joinToString(),
+        genre = otherTags.takeUnless { it.isEmpty() }?.joinToString(),
         web = EhUrl.getGalleryDetailUrl(gid, token),
         pageCount = pages,
         languageISO = simpleLanguage?.lowercase(),

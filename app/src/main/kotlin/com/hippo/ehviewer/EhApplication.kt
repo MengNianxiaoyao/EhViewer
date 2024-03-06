@@ -40,7 +40,9 @@ import com.hippo.ehviewer.client.EhSSLSocketFactory
 import com.hippo.ehviewer.client.EhTagDatabase
 import com.hippo.ehviewer.client.data.GalleryDetail
 import com.hippo.ehviewer.client.install
+import com.hippo.ehviewer.coil.CropBorderInterceptor
 import com.hippo.ehviewer.coil.DownloadThumbInterceptor
+import com.hippo.ehviewer.coil.HardwareBitmapInterceptor
 import com.hippo.ehviewer.coil.MergeInterceptor
 import com.hippo.ehviewer.cronet.cronetHttpClient
 import com.hippo.ehviewer.dailycheck.checkDawn
@@ -59,7 +61,6 @@ import com.hippo.ehviewer.util.AppConfig
 import com.hippo.ehviewer.util.Crash
 import com.hippo.ehviewer.util.FavouriteStatusRouter
 import com.hippo.ehviewer.util.FileUtils
-import com.hippo.ehviewer.util.ReadableTime
 import com.hippo.ehviewer.util.isAtLeastP
 import com.hippo.ehviewer.util.isAtLeastQ
 import com.hippo.ehviewer.util.isAtLeastS
@@ -71,13 +72,10 @@ import eu.kanade.tachiyomi.util.system.logcat
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.cookies.HttpCookies
-import java.io.File
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import logcat.AndroidLogcatLogger
 import logcat.LogPriority
 import logcat.LogcatLogger
-import moe.tarsin.coroutines.runSuspendCatching
 import okhttp3.AsyncDns
 import okhttp3.android.AndroidAsyncDns
 import okio.Path.Companion.toOkioPath
@@ -114,43 +112,32 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
         }
         super.onCreate()
         System.loadLibrary("ehviewer")
-        ReadableTime.initialize(this)
         lifecycleScope.launchIO {
-            launchIO {
+            launch {
                 EhTagDatabase
             }
-            launchIO {
+            launch {
                 EhDB
             }
-            launchIO {
-                DownloadManager.isIdle
+            launch {
+                DownloadManager.readPagesFromLocal()
             }
-            launchIO {
-                runSuspendCatching {
-                    val files = mutableListOf<File>()
-                    AppConfig.externalCrashDir?.listFiles()?.let { files.addAll(it) }
-                    AppConfig.externalParseErrorDir?.listFiles()?.let { files.addAll(it) }
-                    files.sortByDescending { it.lastModified() }
-                    files.forEachIndexed { index, file ->
-                        ensureActive()
-                        if (index > 9) {
-                            file.delete()
-                        }
-                    }
-                }.onFailure {
-                    logcat(it)
-                }
+            launch {
+                FileUtils.cleanupDirectory(AppConfig.externalCrashDir)
+                FileUtils.cleanupDirectory(AppConfig.externalParseErrorDir)
             }
-            launchIO {
+            launch {
                 cleanupDownload()
             }
             if (Settings.requestNews) {
-                launchIO {
+                launch {
                     checkDawn()
                 }
             }
+            launch {
+                cleanObsoleteCache()
+            }
         }
-        cleanObsoleteCache(this)
         if (BuildConfig.DEBUG) {
             StrictMode.enableDefaults()
             Snapshot.registerApplyObserver { anies, _ ->
@@ -189,6 +176,8 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
             add(KtorNetworkFetcherFactory { ktorClient })
             add(MergeInterceptor)
             add(DownloadThumbInterceptor)
+            add(CropBorderInterceptor)
+            add(HardwareBitmapInterceptor)
             if (isAtLeastP) {
                 add(AnimatedImageDecoder.Factory(false))
             } else {

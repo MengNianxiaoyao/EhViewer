@@ -46,6 +46,10 @@ object EhDB {
         runCatching { db.galleryDao().delete(galleryInfo) }
     }
 
+    suspend fun updateGalleryInfo(galleryInfoList: List<BaseGalleryInfo>) {
+        db.galleryDao().update(galleryInfoList)
+    }
+
     fun getReadProgressFlow(gid: Long) = db.progressDao().getPageFlow(gid)
     suspend fun getReadProgress(gid: Long) = db.progressDao().getPage(gid)
     suspend fun putReadProgress(gid: Long, page: Int) = db.progressDao().upsert(ProgressInfo(gid, page))
@@ -190,13 +194,15 @@ object EhDB {
     val historyLazyList
         get() = db.historyDao().joinListLazy()
 
+    fun searchHistory(keyword: String) = db.historyDao().joinListLazy("*$keyword*")
+
     val localFavLazyList
         get() = db.localFavoritesDao().joinListLazy()
 
     val localFavCount: Flow<Int>
         get() = db.localFavoritesDao().count()
 
-    fun searchLocalFav(keyword: String) = db.localFavoritesDao().joinListLazy("%$keyword%")
+    fun searchLocalFav(keyword: String) = db.localFavoritesDao().joinListLazy("*$keyword*")
 
     suspend fun putHistoryInfo(galleryInfo: BaseGalleryInfo) {
         putGalleryInfo(galleryInfo)

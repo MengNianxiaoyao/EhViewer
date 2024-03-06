@@ -115,6 +115,8 @@ object Settings : DataStorePreferences(null) {
     val meteredNetworkWarning = boolPref("cellular_network_warning", false)
     val blackDarkTheme = boolPref("black_dark_theme", false)
     val gridView = boolPref("grid_view", false)
+    val showGalleryPages = boolPref("show_gallery_pages", true)
+    val qSSaveProgress = boolPref("qs_save_progress", true)
     val recentDownloadLabel = stringOrNullPref("recent_download_label", null)
 
     var downloadScheme by stringOrNullPref("image_scheme", null)
@@ -138,14 +140,12 @@ object Settings : DataStorePreferences(null) {
     var requestNews by boolPref("request_news", false).observed { updateWhenRequestNewsChanges() }
     var hideHvEvents by boolPref("hide_hv_events", false)
     var showJpnTitle by boolPref("show_jpn_title", false)
-    var showGalleryPages by boolPref("show_gallery_pages", true)
     var showTagTranslations by boolPref(KEY_SHOW_TAG_TRANSLATIONS, false).observed { updateWhenTagTranslationChanges() }
     var appLinkVerifyTip by boolPref("app_link_verify_tip", false)
     var enabledSecurity by boolPref("enable_secure", false)
     var useCIUpdateChannel by boolPref("ci_update_channel", false)
     var mediaScan by boolPref("media_scan", false).observed { updateWhenKeepMediaStatusChanges() }
     var hasDefaultDownloadLabel by boolPref("has_default_download_label", false)
-    var qSSaveProgress by boolPref("qs_save_progress", true)
     var saveParseErrorBody by boolPref("save_parse_error_body", true)
     var saveCrashLog by boolPref("save_crash_log", true)
     var security by boolPref("require_unlock", false)
@@ -158,6 +158,7 @@ object Settings : DataStorePreferences(null) {
     var downloadOriginImage by boolPref("download_origin_image", false)
     var bypassVpn by boolPref("bypass_vpn", true)
     var enableQuic by boolPref("enable_quic", false)
+    var saveAsCbz by boolPref("save_as_cbz", false)
     var archiveMetadata by boolPref("archive_metadata", true)
     var recentFavCat by intPref("recent_fav_cat", FavListUrlBuilder.FAV_CAT_LOCAL)
     var defaultFavSlot by intPref("default_favorite_slot", -2)
@@ -183,6 +184,8 @@ object Settings : DataStorePreferences(null) {
     var touchSlopFactor by intPref("touch_slop", 3)
 
     // Tachiyomi Reader
+    var newReader by boolPref("new_compose_reader", false)
+
     val cropBorder = boolPref("crop_borders", false)
     val colorFilter = boolPref("pref_color_filter_key", false)
     val colorFilterValue = intPref("color_filter_value", 0)
@@ -192,6 +195,17 @@ object Settings : DataStorePreferences(null) {
     val readingMode = intPref("pref_default_reading_mode_key", ReadingModeType.LEFT_TO_RIGHT.flagValue)
     val orientationMode = intPref("pref_default_orientation_type_key", OrientationType.FREE.flagValue)
     val showReaderSeekbar = boolPref("pref_show_reader_seekbar", true)
+    val showPageNumber = boolPref("pref_show_page_number_key", true)
+    val readerTheme = intPref("pref_reader_theme_key", 1)
+    val doubleTapToZoom = boolPref("pref_double_tap_to_zoom", true)
+    val fullscreen = boolPref("fullscreen", true)
+    val cutoutShort = boolPref("cutout_short", true)
+    val keepScreenOn = boolPref("pref_keep_screen_on_key", true)
+    val readerLongTapAction = boolPref("reader_long_tap", true)
+    val pageTransitions = boolPref("pref_enable_transitions_key", true)
+    val readWithVolumeKeys = boolPref("reader_volume_keys", false)
+    val readWithVolumeKeysInterval = intPref("reader_volume_keys_interval", 0)
+    val readWithVolumeKeysInverted = boolPref("reader_volume_keys_inverted", false)
 
     init {
         if ("CN" == Locale.getDefault().country) {

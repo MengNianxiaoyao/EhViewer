@@ -94,7 +94,6 @@
 - [Kotlin & KotlinX](https://kotlinlang.org/)
 - [MDC-Android](https://github.com/material-components/material-components-android)
 - [Material Icons](https://github.com/google/material-design-icons)
-- [OkHttp](https://square.github.io/okhttp/)
 - [Ktor](https://ktor.io/)
 - [Coil](https://coil-kt.github.io/coil/)
 - [Compose Destinations](https://composedestinations.rafaelcosta.xyz/)
@@ -108,7 +107,7 @@
     Copyright 2014-2019 Hippo Seven
     Copyright 2020-2022 NekoInverter
     Copyright 2022-2023 Tarsin Norbin
-    Copyright 2023 Foolbar
+    Copyright 2023-2024 Foolbar
 
     EhViewer is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 

@@ -3,9 +3,12 @@ package com.hippo.ehviewer.ui.main
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -65,16 +68,21 @@ fun SearchFilter(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val dialogState = LocalDialogState.current
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+    fun isCategoryChecked(bit: Int) = category and bit != 0
+    val categories = remember(category) { categoryTable.sortedBy { !isCategoryChecked(it.first) } }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        categoryTable.forEach {
-            val selected = category and it.first != 0
+        // Workaround for the first item's animation
+        // https://github.com/Calvin-LL/Reorderable/issues/4#issuecomment-1853131769
+        item {}
+        items(categories, { it.first }) {
             FilterChip(
-                selected = selected,
+                selected = isCategoryChecked(it.first),
                 onClick = { onCategoryChanged(category xor it.first) },
                 label = { Text(text = stringResource(id = it.second)) },
+                modifier = Modifier.animateItemPlacement(),
             )
         }
     }
@@ -100,10 +108,7 @@ fun SearchFilter(
             selected = languageFilter != -1,
             onClick = {
                 scope.launch {
-                    val items = buildList {
-                        add(any)
-                        addAll(languages)
-                    }
+                    val items = listOf(any, *languages.toTypedArray())
                     languageFilter = dialogState.showSingleChoice(items, languageFilter + 1) - 1
                 }
             },
@@ -121,7 +126,7 @@ fun SearchFilter(
         val pageErr2 = stringResource(R.string.search_sp_err2)
         val pages = stringResource(id = R.string.key_pages)
         val pagesText = remember(advancedOption.fromPage, advancedOption.toPage) {
-            advancedOption.run {
+            with(advancedOption) {
                 val hasFrom = fromPage > 0
                 val hasTo = toPage > 0
                 if (hasFrom && hasTo) {
@@ -158,8 +163,7 @@ fun SearchFilter(
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     value = expectedValue.first.takeIf { it > 0 }?.toString().orEmpty(),
                                     onValueChange = {
-                                        expectedValue =
-                                            expectedValue.copy(first = it.toIntOrDefault(0).coerceAtLeast(0))
+                                        expectedValue = expectedValue.copy(first = it.toIntOrDefault(0).coerceAtLeast(0))
                                     },
                                     modifier = Modifier.width(112.dp).padding(16.dp),
                                     singleLine = true,
@@ -170,8 +174,7 @@ fun SearchFilter(
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     value = expectedValue.second.takeIf { it > 0 }?.toString().orEmpty(),
                                     onValueChange = {
-                                        expectedValue =
-                                            expectedValue.copy(second = it.toIntOrDefault(0).coerceAtLeast(0))
+                                        expectedValue = expectedValue.copy(second = it.toIntOrDefault(0).coerceAtLeast(0))
                                     },
                                     modifier = Modifier.width(112.dp).padding(16.dp),
                                     singleLine = true,

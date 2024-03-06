@@ -13,20 +13,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingSource
@@ -36,7 +29,6 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import arrow.fx.coroutines.parMap
-import coil3.imageLoader
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhEngine
@@ -46,7 +38,9 @@ import com.hippo.ehviewer.client.data.GalleryPreview
 import com.hippo.ehviewer.coil.justDownload
 import com.hippo.ehviewer.collectAsState
 import com.hippo.ehviewer.ktbuilder.imageRequest
+import com.hippo.ehviewer.ktbuilder.launchIn
 import com.hippo.ehviewer.ui.LockDrawer
+import com.hippo.ehviewer.ui.composing
 import com.hippo.ehviewer.ui.main.EhPreviewItem
 import com.hippo.ehviewer.ui.navToReader
 import com.hippo.ehviewer.ui.tools.FastScrollLazyVerticalGrid
@@ -55,44 +49,23 @@ import com.hippo.ehviewer.ui.tools.getClippedRefreshKey
 import com.hippo.ehviewer.ui.tools.getLimit
 import com.hippo.ehviewer.ui.tools.getOffset
 import com.hippo.ehviewer.ui.tools.rememberInVM
+import com.hippo.ehviewer.util.flattenForEach
 import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.withIOContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import moe.tarsin.coroutines.runSuspendCatching
 
 @Destination
 @Composable
-fun GalleryPreviewScreen(galleryDetail: GalleryDetail, toNextPageArg: Boolean, navigator: NavController) {
+fun GalleryPreviewScreen(detail: GalleryDetail, toNextPage: Boolean, navigator: DestinationsNavigator) = composing(navigator) {
     LockDrawer(true)
-    val context = LocalContext.current
-    fun onPreviewClick(index: Int) = context.navToReader(galleryDetail.galleryInfo, index)
     val scrollBehaviour = TopAppBarDefaults.pinnedScrollBehavior()
-    val state = rememberLazyGridState()
-    val coroutineScope = rememberCoroutineScope { Dispatchers.IO }
-    val pages = galleryDetail.pages
-    val pgSize = galleryDetail.previewList.size
+    val pgSize = detail.previewList.size
+    val state = rememberLazyGridState(initialFirstVisibleItemIndex = if (toNextPage) pgSize else 0)
     val thumbColumns by Settings.thumbColumns.collectAsState()
-    var toNextPage by rememberSaveable { mutableStateOf(toNextPageArg) }
-
-    LaunchedEffect(Unit) {
-        if (toNextPage) state.scrollToItem(pgSize)
-        toNextPage = false
-    }
-
-    suspend fun getPreviewListByPage(page: Int) = galleryDetail.run {
-        val url = EhUrl.getGalleryDetailUrl(gid, token, page, false)
-        val result = EhEngine.getPreviewList(url)
-        if (Settings.preloadThumbAggressively) {
-            coroutineScope.launch {
-                context.run { result.first.first.forEach { imageLoader.enqueue(imageRequest(it) { justDownload() }) } }
-            }
-        }
-        result.first.first
-    }
-
     val data = rememberInVM {
-        val previewPagesMap = galleryDetail.previewList.associateBy { it.position } as MutableMap
+        val pages = detail.pages
+        val previewPagesMap = detail.previewList.associateBy { it.position } as MutableMap
         Pager(
             PagingConfig(
                 pageSize = pgSize,
@@ -107,10 +80,17 @@ fun GalleryPreviewScreen(galleryDetail: GalleryDetail, toNextPageArg: Boolean, n
                     val key = params.key ?: 0
                     val up = getOffset(params, key, pages)
                     val end = (up + getLimit(params, key) - 1).coerceAtMost(pages - 1)
-                    runSuspendCatching {
+                    detail.runSuspendCatching {
                         (up..end).filterNot { it in previewPagesMap }.map { it / pgSize }.toSet()
-                            .parMap(concurrency = Settings.multiThreadDownload) { getPreviewListByPage(it) }
-                            .forEach { previews -> previews.forEach { previewPagesMap[it.position] = it } }
+                            .parMap(concurrency = Settings.multiThreadDownload) { page ->
+                                val url = EhUrl.getGalleryDetailUrl(gid, token, page, false)
+                                EhEngine.getPreviewList(url).first
+                            }.flattenForEach {
+                                previewPagesMap[it.position] = it
+                                if (Settings.preloadThumbAggressively) {
+                                    imageRequest(it) { justDownload() }.launchIn(viewModelScope)
+                                }
+                            }
                     }.foldToLoadResult {
                         val r = (up..end).map { requireNotNull(previewPagesMap[it]) }
                         val prevK = if (up <= 0 || r.isEmpty()) null else up
@@ -128,7 +108,7 @@ fun GalleryPreviewScreen(galleryDetail: GalleryDetail, toNextPageArg: Boolean, n
             TopAppBar(
                 title = { Text(stringResource(R.string.gallery_previews)) },
                 navigationIcon = {
-                    IconButton(onClick = { navigator.popBackStack() }) {
+                    IconButton(onClick = { popBackStack() }) {
                         Icon(imageVector = Icons.AutoMirrored.Default.ArrowBack, contentDescription = null)
                     }
                 },
@@ -150,9 +130,7 @@ fun GalleryPreviewScreen(galleryDetail: GalleryDetail, toNextPageArg: Boolean, n
                 contentType = data.itemContentType(),
             ) { index ->
                 val item = data[index]
-                EhPreviewItem(item, index) {
-                    onPreviewClick(index)
-                }
+                EhPreviewItem(item, index) { navToReader(detail.galleryInfo, index) }
             }
         }
     }

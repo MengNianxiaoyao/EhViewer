@@ -337,6 +337,7 @@
     <string name="settings_download_preload_image_summary">向后预载 %s 张图片</string>
     <string name="settings_download_download_origin_image">下载原图</string>
     <string name="settings_download_download_origin_image_summary">警告！可能需要 GP</string>
+    <string name="settings_download_save_as_cbz">保存为 CBZ 压缩包</string>
     <string name="settings_download_archive_metadata">压缩包元数据</string>
     <string name="settings_download_archive_metadata_summary">下载压缩包时生成 ComicInfo.xml</string>
     <string name="settings_download_media_scan">允许媒体扫描</string>
@@ -472,6 +473,8 @@
     <string name="title_desc">标题（降序）</string>
     <string name="download_label_asc">下载标签（升序）</string>
     <string name="download_label_desc">下载标签（降序）</string>
+    <string name="page_count_asc">页数（升序）</string>
+    <string name="page_count_desc">页数（降序）</string>
     <string name="download_filter">过滤</string>
     <string name="download_all">全部</string>
     <string name="download_start_all_reversed">全部开始（倒序）</string>

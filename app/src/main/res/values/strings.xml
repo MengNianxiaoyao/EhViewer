@@ -384,6 +384,7 @@
     <string name="settings_download_preload_image_summary">Preload next %s image</string>
     <string name="settings_download_download_origin_image">Download original image</string>
     <string name="settings_download_download_origin_image_summary">Caution! May require GP</string>
+    <string name="settings_download_save_as_cbz">Save as CBZ archive</string>
     <string name="settings_download_archive_metadata">Archive metadata</string>
     <string name="settings_download_archive_metadata_summary">Generate ComicInfo.xml on archive download</string>
     <string name="settings_download_restore_download_items">Restore download items</string>
@@ -537,6 +538,8 @@
     <string name="title_desc">Title (descending)</string>
     <string name="download_label_asc">Download label (ascending)</string>
     <string name="download_label_desc">Download label (descending)</string>
+    <string name="page_count_asc">Page count (ascending)</string>
+    <string name="page_count_desc">Page count (descending)</string>
     <string name="download_filter">Filter</string>
     <string name="download_all">All</string>
     <string name="download_start_all_reversed">Start all (reversed)</string>

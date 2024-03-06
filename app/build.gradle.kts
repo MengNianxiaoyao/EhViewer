@@ -19,8 +19,7 @@ plugins {
 }
 
 android {
-    compileSdkPreview = "VanillaIceCream"
-    buildToolsVersion = "35.0.0-rc1"
+    compileSdk = 34
     ndkVersion = "26.2.11394342"
 
     splits {
@@ -241,6 +240,7 @@ dependencies {
 
     implementation(libs.aboutlibraries.core)
     implementation(libs.aboutlibraries.compose.m3)
+    implementation(libs.accompanist.drawable.painter)
 
     implementation(libs.insetter) // Dead Dependency
 
@@ -252,6 +252,8 @@ dependencies {
     // https://coil-kt.github.io/coil/changelog/
     implementation(platform(libs.coil.bom))
     implementation(libs.bundles.coil)
+
+    implementation(libs.telephoto.zoomable)
 
     implementation(libs.bundles.ktor)
 
