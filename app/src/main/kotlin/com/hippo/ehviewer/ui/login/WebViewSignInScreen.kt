@@ -1,5 +1,9 @@
 package com.hippo.ehviewer.ui.login
 
+import android.content.Context
+import android.util.Log
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -7,9 +11,13 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.google.accompanist.web.AccompanistWebViewClient
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
+import com.hippo.ehviewer.EhApplication
+import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.client.CHROME_ACCEPT
 import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.EhUtils
@@ -22,8 +30,46 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import eu.kanade.tachiyomi.util.lang.launchIO
 import eu.kanade.tachiyomi.util.lang.withNonCancellableContext
-import eu.kanade.tachiyomi.util.lang.withUIContext
 import io.ktor.http.Url
+import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Cookie
+import okhttp3.FormBody
+import okhttp3.Request
+import org.json.JSONObject
+
+val okHttpClient = EhApplication.nonCacheOkHttpClient
+
+val jsCode = """
+(function() {
+    // 使用表单name属性'LOGIN'来获取表单元素
+    var form = document.forms['LOGIN'];
+    if (form) {
+        form.onsubmit = function(event) {
+            event.preventDefault();  // 阻止表单的默认提交行为
+
+            // 把表单元素和它们的值转换为一个对象
+            var formData = {};
+            for (var i = 0; i < form.elements.length; i++) {
+                var field = form.elements[i];
+                // 排除不需要提交的字段
+                if (field.name && !field.disabled && field.type !== 'submit' && field.type !== 'button') {
+                    formData[field.name] = field.value;
+                }
+            }
+
+            // 转换为 JSON 字符串
+            var json = JSON.stringify(formData);
+
+            // 发送数据到 Kotlin 端处理
+            Android.postFormData(form.action, json);
+        };
+    }
+})();
+"""
 
 @Destination
 @Composable
@@ -31,42 +77,221 @@ fun WebViewSignInScreen(navigator: DestinationsNavigator) {
     LockDrawer(true)
     val coroutineScope = rememberCoroutineScope()
     val state = rememberWebViewState(url = EhUrl.URL_SIGN_IN)
-    val client = remember {
-        object : AccompanistWebViewClient() {
-            private var present = false
-            override fun onPageFinished(view: WebView, url: String?) {
-                if (present) {
-                    view.destroy()
-                    return
-                }
-                var getId = false
-                var getHash = false
-                EhCookieStore.load(Url(EhUrl.HOST_E)).forEach {
-                    if (EhCookieStore.KEY_IPB_MEMBER_ID == it.name) {
-                        getId = true
-                    } else if (EhCookieStore.KEY_IPB_PASS_HASH == it.name) {
-                        getHash = true
+    class OkHttpWebViewClient(
+        private val jsCode: String,
+        private val onLoginSuccess: () -> Unit,
+        private val onLoginFailed: () -> Unit,
+    ) : AccompanistWebViewClient() {
+
+        override fun shouldInterceptRequest(view: WebView, request: android.webkit.WebResourceRequest): WebResourceResponse? {
+            val url = request.url.toString()
+            val okHttpRequest = Request.Builder().url(url).build()
+
+            return try {
+                val response = okHttpClient.newCall(okHttpRequest).execute()
+                if (response.isSuccessful) {
+                    WebResourceResponse(
+                        response.header("Content-Type") ?: "text/plain",
+                        response.header("Content-Encoding") ?: "utf-8",
+                        response.body.byteStream(),
+                    ).apply {
+                        setStatusCodeAndReasonPhrase(response.code, response.message)
                     }
+                } else {
+                    response.body.close()
+                    null
                 }
-                if (getId && getHash) {
-                    present = true
-                    coroutineScope.launchIO {
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        private var present = false
+        override fun onPageFinished(view: WebView, url: String?) {
+            super.onPageFinished(view, url)
+
+            if (url == EhUrl.URL_SIGN_IN) {
+                view.evaluateJavascript(jsCode, null)
+            }
+
+            if (present) {
+                view.destroy()
+                return
+            }
+            // 检查是否已经存在cookie
+            var getId = false
+            var getHash = false
+            EhCookieStore.load(Url(EhUrl.HOST_E)).forEach {
+                if (EhCookieStore.KEY_IPB_MEMBER_ID == it.name) {
+                    getId = true
+                } else if (EhCookieStore.KEY_IPB_PASS_HASH == it.name) {
+                    getHash = true
+                }
+            }
+            if (getId && getHash) {
+                present = true
+                coroutineScope.launchIO {
+                    try {
                         val canEx = withNonCancellableContext { postLogin() }
-                        withUIContext { navigator.popNavigate(if (canEx) SelectSiteScreenDestination else StartDestination) }
+                        if (canEx) {
+                            onLoginSuccess()
+                        } else {
+                            onLoginFailed()
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            onLoginFailed()
+                            Log.e("OkHttpWebViewClient", "Login failed: ${e.localizedMessage}")
+                        }
                     }
                 }
             }
         }
     }
+    class WebAppInterface(
+        private val webView: WebView,
+        private val coroutineScope: CoroutineScope,
+        private val context: Context,
+        private val handler: (WebView, String, String, CoroutineScope) -> Unit,
+    ) {
+        @JavascriptInterface
+        fun postFormData(url: String, formData: String) {
+            Log.d("WebAppInterface", "Received form data: $formData")
+            handler(webView, url, formData, coroutineScope)
+        }
+    }
+    val context = LocalContext.current
     SideEffect {
         EhUtils.signOut()
+    }
+    val okHttpWebViewClient = remember {
+        OkHttpWebViewClient(
+            jsCode = jsCode,
+            onLoginSuccess = {
+                navigator.popNavigate(SelectSiteScreenDestination)
+            },
+            onLoginFailed = {
+                navigator.popNavigate(StartDestination)
+            },
+        )
+    }
+    fun handlePostRequest(webView: WebView, url: String, formData: String, scope: CoroutineScope) {
+        val okHttpClient = okHttpClient.newBuilder().build()
+
+        val formBodyBuilder = FormBody.Builder()
+        val formFields = JSONObject(formData)
+        formFields.keys().forEach {
+            formBodyBuilder.add(it, formFields.getString(it))
+        }
+        val formBody = formBodyBuilder.build()
+
+        // 构建请求
+        val request = Request.Builder()
+            .url(url)
+            .post(formBody)
+            .addHeader("Referer", "https://forums.e-hentai.org/index.php?act=Login&CODE=00")
+            .addHeader("Origin", "https://forums.e-hentai.org")
+            .addHeader("User-Agent", Settings.userAgent)
+            .addHeader("Accept", CHROME_ACCEPT)
+            // .addHeader("AcceptLanguage", CHROME_ACCEPT_LANGUAGE)
+            .build()
+
+        fun parseSetCookieHeader(setCookie: String): Cookie? {
+            try {
+                // 将Set-Cookie头分割为单个组件
+                val cookieComponents = setCookie.split(";").map { it.trim() }
+                var name: String? = null
+                var value: String? = null
+                var domain: String? = null
+                var path: String? = null
+
+                // 分析每个组件
+                cookieComponents.forEach { component ->
+                    val keyValue = component.split("=", limit = 2)
+                    when {
+                        keyValue[0].equals("domain", ignoreCase = true) -> {
+                            domain = keyValue.getOrNull(1)?.trimStart('.')
+                        }
+                        keyValue[0].equals("path", ignoreCase = true) -> {
+                            path = keyValue.getOrNull(1)
+                        }
+                        keyValue[0].equals("expires", ignoreCase = true) ||
+                            keyValue[0].equals("max-age", ignoreCase = true) ||
+                            keyValue[0].equals("secure", ignoreCase = true) ||
+                            keyValue[0].equals("httponly", ignoreCase = true) -> {
+                            // 不需要处理这些属性
+                        }
+                        else -> {
+                            // 认为是Cookie的名称和值
+                            if (name == null) {
+                                name = keyValue[0]
+                                value = keyValue.getOrNull(1)
+                            }
+                        }
+                    }
+                }
+
+                if (name != null && value != null) {
+                    val cookieBuilder = Cookie.Builder().name(name!!).value(value!!)
+                    if (domain != null) cookieBuilder.domain(domain!!)
+                    if (path != null) cookieBuilder.path(path!!)
+                    return cookieBuilder.build()
+                }
+            } catch (e: IllegalArgumentException) {
+                // 处理非法域异常
+                Log.e("EhCookieStore", "Error parsing Set-Cookie header due to illegal domain: $e")
+            }
+            return null
+        }
+
+        scope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    okHttpClient.newCall(request).execute()
+                }
+
+                if (response.isSuccessful) {
+                    withContext(Dispatchers.Main) {
+                        // 如果成功，加载返回的URL
+                        val replyUrl = response.request.url.toString()
+                        webView.loadUrl(replyUrl)
+                        Log.d("handlePostRequest", "Response URL loaded: $replyUrl")
+                    }
+                } else {
+                    Log.e("handlePostRequest", "Request failed: $response")
+                }
+
+                // 假设 'response' 是已经执行并获得响应的OkHttp响应对象
+                val responseCookies = response.headers("Set-Cookie")
+                // Log.d("EhCookieStore", "Set-Cookie headers found: $responseCookies")
+
+                // 使用EhCookieStore来逐个存储Cookie
+                responseCookies.forEach { cookieHeader ->
+                    // 解析Cookie
+                    val parsedCookie = parseSetCookieHeader(cookieHeader)
+                    parsedCookie?.let { cookie ->
+                        // 使用EhCookieStore的addCookie方法添加Cookie
+                        EhCookieStore.addCookie(cookie.name, cookie.value, cookie.domain)
+                    }
+                }
+                // 确保新的Cookie被写入
+                EhCookieStore.flush()
+            } catch (e: IOException) {
+                Log.e("handlePostRequest", "Request error: ${e.localizedMessage}")
+            }
+        }
     }
     WebView(
         state = state,
         modifier = Modifier.fillMaxSize(),
-        onCreated = {
-            it.setDefaultSettings()
+        onCreated = { webView ->
+            webView.setDefaultSettings()
+            webView.settings.javaScriptEnabled = true
+            webView.addJavascriptInterface(
+                WebAppInterface(webView, coroutineScope, context, ::handlePostRequest),
+                "Android",
+            )
         },
-        client = client,
+        client = okHttpWebViewClient,
     )
 }
