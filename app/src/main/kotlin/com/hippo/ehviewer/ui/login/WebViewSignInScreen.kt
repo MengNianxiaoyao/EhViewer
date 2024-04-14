@@ -105,7 +105,7 @@ fun WebViewSignInScreen(navigator: DestinationsNavigator) {
             val okHttpRequest = Request.Builder()
                 .url(url)
                 .addHeader("Referer", EhUrl.URL_SIGN_IN)
-                .addHeader("Origin", EhUrl.URL_FORUMS)
+                .addHeader("Origin", EhUrl.origin)
                 .addHeader("User-Agent", Settings.userAgent)
                 .addHeader("Accept", CHROME_ACCEPT)
                 .addHeader("Accept-Language", CHROME_ACCEPT_LANGUAGE)
