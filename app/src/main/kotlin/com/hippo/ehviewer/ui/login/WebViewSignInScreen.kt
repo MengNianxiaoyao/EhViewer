@@ -14,6 +14,7 @@ import com.google.accompanist.web.AccompanistWebViewClient
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
 import com.hippo.ehviewer.EhApplication
+import com.hippo.ehviewer.EhApplication.Companion.nonH2OkHttpClient
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.CHROME_ACCEPT
 import com.hippo.ehviewer.client.CHROME_ACCEPT_LANGUAGE
@@ -39,7 +40,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.FormBody
 import okhttp3.Interceptor
-import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
@@ -88,13 +88,12 @@ fun WebViewSignInScreen(navigator: DestinationsNavigator) {
 
         override fun shouldInterceptRequest(view: WebView, request: android.webkit.WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
-            val nonH2okHttpClient = okHttpClient.newBuilder().protocols(listOf(Protocol.HTTP_3, Protocol.HTTP_1_1)).build()
             val h2okHttpClient = okHttpClient.newBuilder().build()
             val h2Interceptor = object : Interceptor {
                 override fun intercept(chain: Interceptor.Chain): Response {
                     val request = chain.request()
                     val selectedClient = if (request.url.host == "forums.e-hentai.org") {
-                        nonH2okHttpClient
+                        nonH2OkHttpClient
                     } else {
                         h2okHttpClient
                     }

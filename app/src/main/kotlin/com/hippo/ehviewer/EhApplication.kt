@@ -81,6 +81,7 @@ import logcat.LogPriority
 import logcat.LogcatLogger
 import logcat.asLog
 import okhttp3.AsyncDns
+import okhttp3.Protocol
 import okhttp3.android.AndroidAsyncDns
 import okio.Path.Companion.toOkioPath
 import splitties.arch.room.roomDb
@@ -260,6 +261,10 @@ class EhApplication : Application(), SingletonImageLoader.Factory {
                 install(EhSSLSocketFactory)
             }
         }
+
+        val nonH2OkHttpClient = nonCacheOkHttpClient.newBuilder()
+            .protocols(listOf(Protocol.HTTP_3, Protocol.HTTP_1_1))
+            .build()
 
         val noRedirectOkHttpClient by lazy {
             httpClient(baseOkHttpClient) {
