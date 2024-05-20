@@ -37,7 +37,7 @@ fun configureCronetEngineBuilder(builder: ExperimentalCronetEngine.Builder) {
                     "MAP e-hentai.org $CloudflareIP," +
                     "MAP exhentai.org $CloudflareIP," +
                     "MAP *.exhentai.org $CloudflareIP," +
-                    "MAP cdn.jsdelivr.net $CloudflareIP," +
+                    "MAP testingcf.jsdelivr.net $CloudflareIP," +
                     "MAP api.github.com ${builtInHosts["api.github.com"]}",
             ),
         )
@@ -51,7 +51,7 @@ fun configureCronetEngineBuilder(builder: ExperimentalCronetEngine.Builder) {
                     "MAP exhentai.org ${builtInHosts["exhentai.org"]}," +
                     "MAP *.exhentai.org ${builtInHosts["exhentai.org"]}," +
                     "MAP api.github.com ${builtInHosts["api.github.com"]}," +
-                    "MAP cdn.jsdelivr.net cdn.jsdelivr.net.cdn.cloudflare.net",
+                    "MAP testingcf.jsdelivr.net testingcf.jsdelivr.net.cdn.cloudflare.net",
             ),
         )
     }
