@@ -1,4 +1,3 @@
-import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 import com.mikepenz.aboutlibraries.plugin.DuplicateMode.MERGE
 import com.mikepenz.aboutlibraries.plugin.DuplicateRule.GROUP
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
@@ -65,15 +64,12 @@ android {
     val chromeVersion = rootProject.layout.projectDirectory.file("chrome-for-testing/LATEST_RELEASE_STABLE").asFile
         .readText().substringBefore('.')
 
-    val githubToken = gradleLocalProperties(rootDir, providers)["GITHUB_TOKEN"] as? String
-        ?: System.getenv("GITHUB_TOKEN").orEmpty()
-
     defaultConfig {
         applicationId = "moe.tarsin.ehviewer"
         minSdk = 26
         targetSdk = 35
         versionCode = 180058
-        versionName = "1.11.7"
+        versionName = "1.11.7.2"
         versionNameSuffix = "-cc"
         resourceConfigurations.addAll(
             listOf(
@@ -96,7 +92,6 @@ android {
         buildConfigField("long", "COMMIT_TIME", commitTime)
         buildConfigField("String", "REPO_NAME", "\"$repoName\"")
         buildConfigField("String", "CHROME_VERSION", "\"$chromeVersion\"")
-        buildConfigField("String", "GITHUB_TOKEN", "\"$githubToken\"")
         ndk {
             if (isRelease) {
                 abiFilters.addAll(supportedAbis)

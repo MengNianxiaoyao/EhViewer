@@ -15,17 +15,16 @@
  */
 package com.hippo.ehviewer.client.parser
 
+import com.hippo.ehviewer.client.EhCookieStore.KEY_IPB_MEMBER_ID
+import com.hippo.ehviewer.client.EhCookieStore.getIdentityCookies
 import com.hippo.ehviewer.client.EhUrl
 import com.hippo.ehviewer.client.exception.NotLoggedInException
 import com.hippo.ehviewer.util.ExceptionUtils
-import org.jsoup.Jsoup
 
 object ForumsParser {
     fun parse(body: String): String = runCatching {
-        val d = Jsoup.parse(body, EhUrl.URL_FORUMS)
-        val userlinks = d.getElementById("userlinks")
-        val child = userlinks!!.child(0).child(0).child(0)
-        child.attr("href")
+        val ipbMemberId = getIdentityCookies().find { it.first == KEY_IPB_MEMBER_ID }?.second
+        EhUrl.URL_FORUMS + "index.php?showuser=" + ipbMemberId
     }.getOrElse {
         ExceptionUtils.throwIfFatal(it)
         throw NotLoggedInException()
