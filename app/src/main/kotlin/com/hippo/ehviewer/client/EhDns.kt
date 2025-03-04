@@ -29,10 +29,6 @@ val builtInDoHUrls = listOf(
     "https://77.88.8.8/dns-query",
     "https://94.140.14.140/dns-query",
     "https://94.140.14.141/dns-query",
-    "https://162.159.36.1/dns-query",
-    "https://162.159.46.1/dns-query",
-    "https://1.1.1.1/dns-query",
-    "https://1.0.0.1/dns-query",
     "https://wikimedia-dns.org/dns-query",
     "https://odvr.nic.cz/dns-query",
 )
