@@ -15,20 +15,10 @@ private typealias HostsMap = MutableMap<String, List<InetAddress>>
 const val CFSUFFIX = ".cdn.cloudflare.net"
 
 val builtInDoHUrls = listOf(
-    "https://185.222.222.222/dns-query",
-    "https://45.11.45.11/dns-query",
-    "https://9.9.9.9/dns-query",
-    "https://149.112.112.112/dns-query",
-    "https://208.67.220.220/dns-query",
-    "https://208.67.222.222/dns-query",
-    "https://146.112.41.5/dns-query",
-    "https://101.101.101.101/dns-query",
     "https://130.59.31.248/dns-query",
     "https://130.59.31.251/dns-query",
     "https://77.88.8.1/dns-query",
     "https://77.88.8.8/dns-query",
-    "https://94.140.14.140/dns-query",
-    "https://94.140.14.141/dns-query",
     "https://wikimedia-dns.org/dns-query",
     "https://odvr.nic.cz/dns-query",
 )
